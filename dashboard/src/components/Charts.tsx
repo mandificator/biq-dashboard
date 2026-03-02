@@ -229,7 +229,7 @@ export const CheckInChart = React.memo(function CheckInChart({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: -16 }}
             onClick={(state) => {
-              if (!state || state.activeTooltipIndex == null) return;
+              if (!state || typeof state.activeTooltipIndex !== 'number') return;
               const idx = state.activeTooltipIndex;
               const point = chartData[idx];
               if (!point || point.userIds.length === 0) return;
@@ -285,7 +285,7 @@ export const CheckOutChart = React.memo(function CheckOutChart({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: -16 }}
             onClick={(state) => {
-              if (!state || state.activeTooltipIndex == null) return;
+              if (!state || typeof state.activeTooltipIndex !== 'number') return;
               const idx = state.activeTooltipIndex;
               const point = chartData[idx];
               if (!point || point.userIds.length === 0) return;
