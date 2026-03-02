@@ -11,6 +11,19 @@ interface JourneyStep {
   stepIndex: number;
 }
 
+interface JourneyEdge {
+  from: string;
+  to: string;
+  trips: number;
+}
+
+interface JourneySummary {
+  edges: JourneyEdge[];
+  beaconIds: Set<string>;
+  startBeaconId: string;
+  endBeaconId: string;
+}
+
 interface FsSettings {
   bgColor: string;
   showTitle: boolean;
@@ -177,6 +190,10 @@ interface Props {
   filteredBeaconIds?: string[] | null;
   profiles?: Record<string, Profile>;
   eventName?: string;
+  eventStartTime?: number;
+  eventEndTime?: number;
+  onPlaybackTime?: (time: number | null) => void;
+  playbackTime?: number | null;
 }
 
 export default function BeaconHeatmap({
@@ -194,6 +211,10 @@ export default function BeaconHeatmap({
   filteredBeaconIds,
   profiles,
   eventName,
+  eventStartTime,
+  eventEndTime,
+  onPlaybackTime,
+  playbackTime,
 }: Props) {
   const beaconList = useMemo(() => Object.values(beacons), [beacons]);
   const maxCount = useMemo(
@@ -249,6 +270,174 @@ export default function BeaconHeatmap({
   const [showSettings, setShowSettings] = useState(false);
   // Separate positions for fullscreen — independent of widget positions
   const [fsPositions, setFsPositions] = useState<Record<string, { x: number; y: number }>>({});
+
+  // ── Timeline player state ──
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [localPlaybackTime, setLocalPlaybackTime] = useState(eventStartTime || 0);
+  const [playSpeed, setPlaySpeed] = useState(100);
+  const [viewMode, setViewMode] = useState<"lines" | "pfps">("lines");
+  const playRafRef = useRef<number>(0);
+  const playLastFrameRef = useRef<number>(0);
+  const hasTimeline = eventStartTime != null && eventEndTime != null && onPlaybackTime && eventEndTime > eventStartTime;
+  const isPlaybackActive = playbackTime != null;
+
+  // Sync local time from parent when scrubbing
+  useEffect(() => {
+    if (playbackTime != null) setLocalPlaybackTime(playbackTime);
+  }, [playbackTime]);
+
+  // Reset local time when event times change
+  useEffect(() => {
+    if (eventStartTime != null) setLocalPlaybackTime(eventStartTime);
+  }, [eventStartTime]);
+
+  // Animation loop
+  useEffect(() => {
+    if (!isPlaying || !hasTimeline) return;
+    playLastFrameRef.current = performance.now();
+
+    const tick = (now: number) => {
+      const delta = (now - playLastFrameRef.current) / 1000;
+      playLastFrameRef.current = now;
+      setLocalPlaybackTime((prev) => {
+        const next = prev + delta * playSpeed;
+        if (next >= eventEndTime!) {
+          setIsPlaying(false);
+          onPlaybackTime!(eventEndTime!);
+          return eventEndTime!;
+        }
+        onPlaybackTime!(next);
+        return next;
+      });
+      playRafRef.current = requestAnimationFrame(tick);
+    };
+
+    playRafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(playRafRef.current);
+  }, [isPlaying, playSpeed, eventEndTime, onPlaybackTime, hasTimeline]);
+
+  const handlePlay = useCallback(() => {
+    if (!hasTimeline) return;
+    if (localPlaybackTime >= eventEndTime!) {
+      setLocalPlaybackTime(eventStartTime!);
+      onPlaybackTime!(eventStartTime!);
+    }
+    setIsPlaying(true);
+    onPlaybackTime!(localPlaybackTime);
+  }, [hasTimeline, localPlaybackTime, eventEndTime, eventStartTime, onPlaybackTime]);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  const handleStop = useCallback(() => {
+    setIsPlaying(false);
+    setLocalPlaybackTime(eventStartTime || 0);
+    onPlaybackTime?.(null);
+  }, [eventStartTime, onPlaybackTime]);
+
+  const handleScrub = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = Number(e.target.value);
+    setLocalPlaybackTime(t);
+    onPlaybackTime?.(t);
+    if (isPlaying) setIsPlaying(false);
+  }, [isPlaying, onPlaybackTime]);
+
+  // ── Moving PFPs during playback ──
+  const movingPfps = useMemo(() => {
+    if (!isPlaybackActive || viewMode !== "pfps" || !proofs || !profiles || !playbackTime) return null;
+
+    // Build per-user timeline of beacon visits up to playbackTime
+    const userTimelines: Record<string, { beaconId: string; time: number }[]> = {};
+    for (const p of proofs) {
+      if (p.time <= playbackTime) {
+        if (!userTimelines[p.userId]) userTimelines[p.userId] = [];
+        userTimelines[p.userId].push({ beaconId: p.beaconId, time: p.time });
+      }
+    }
+
+    const activePositionsMap = isFullscreen ? fsPositions : positions;
+    const maxC = Math.max(1, ...Object.values(beaconProofCounts));
+
+    // First pass: figure out who is at each beacon (not moving)
+    const beaconOccupants: Record<string, string[]> = {};
+    const pfpRaw: { userId: string; beaconId: string; pic: string; name: string; moving: boolean; x: number; y: number }[] = [];
+
+    for (const [uid, timeline] of Object.entries(userTimelines)) {
+      if (timeline.length === 0) continue;
+      timeline.sort((a, b) => a.time - b.time);
+      const profile = profiles[uid];
+      if (!profile?.profilePicture) continue;
+
+      const last = timeline[timeline.length - 1];
+      const lastPos = activePositionsMap[last.beaconId];
+      if (!lastPos) continue;
+
+      // Check if user is "in transit" — interpolate between last two different beacons
+      let moving = false;
+      let x = lastPos.x;
+      let y = lastPos.y;
+
+      if (timeline.length >= 2) {
+        const prev = timeline[timeline.length - 2];
+        if (prev.beaconId !== last.beaconId) {
+          const prevPos = activePositionsMap[prev.beaconId];
+          if (prevPos) {
+            const transitionDuration = Math.min(last.time - prev.time, 120);
+            const elapsed = playbackTime - prev.time;
+            const t = Math.min(1, elapsed / transitionDuration);
+            if (t < 1) {
+              // Smooth easing
+              const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              x = prevPos.x + (lastPos.x - prevPos.x) * ease;
+              y = prevPos.y + (lastPos.y - prevPos.y) * ease;
+              moving = true;
+            }
+          }
+        }
+      }
+
+      if (!moving) {
+        // Track beacon occupants for ring layout
+        if (!beaconOccupants[last.beaconId]) beaconOccupants[last.beaconId] = [];
+        beaconOccupants[last.beaconId].push(uid);
+      }
+
+      pfpRaw.push({ userId: uid, beaconId: last.beaconId, pic: profile.profilePicture, name: profile.displayName || uid, moving, x, y });
+    }
+
+    // Second pass: position occupants in rings around their beacon
+    const PR = 7; // pfp radius in SVG coords
+    for (const item of pfpRaw) {
+      if (item.moving) continue;
+      const beaconPos = activePositionsMap[item.beaconId];
+      if (!beaconPos) continue;
+
+      const occupants = beaconOccupants[item.beaconId] || [];
+      const idx = occupants.indexOf(item.userId);
+      const total = occupants.length;
+      const count = beaconProofCounts[item.beaconId] || 0;
+      const nodeRadius = 18 + (count / maxC) * 22;
+
+      if (total === 1) {
+        // Single occupant: place just outside the beacon circle (top)
+        item.x = beaconPos.x;
+        item.y = beaconPos.y - nodeRadius - PR - 2;
+      } else {
+        // Multiple: spread in concentric rings around the beacon
+        const perRing = Math.max(6, Math.floor((2 * Math.PI * (nodeRadius + PR + 4)) / (PR * 2.4)));
+        const ringIdx = Math.floor(idx / perRing);
+        const posInRing = idx % perRing;
+        const ringTotal = Math.min(perRing, total - ringIdx * perRing);
+        const ringRadius = nodeRadius + PR + 4 + ringIdx * (PR * 2.4);
+        const angle = (2 * Math.PI * posInRing) / ringTotal - Math.PI / 2;
+        item.x = beaconPos.x + Math.cos(angle) * ringRadius;
+        item.y = beaconPos.y + Math.sin(angle) * ringRadius;
+      }
+    }
+
+    return pfpRaw;
+  }, [isPlaybackActive, viewMode, proofs, profiles, playbackTime, positions, fsPositions, isFullscreen, beaconProofCounts]);
 
   // Fullscreen display settings — persisted to localStorage
   const [fsSettings, setFsSettings] = useState<FsSettings>(FS_DEFAULTS);
@@ -653,6 +842,31 @@ export default function BeaconHeatmap({
     return steps;
   }, [selectedUserJourney]);
 
+  // Simplified journey: one edge per beacon pair with trip count
+  const journeySummary = useMemo<JourneySummary | null>(() => {
+    if (journeySteps.length < 2) return null;
+    const edgeMap: Record<string, number> = {};
+    const beaconIds = new Set<string>();
+    for (const s of journeySteps) beaconIds.add(s.beaconId);
+    for (let i = 1; i < journeySteps.length; i++) {
+      const a = journeySteps[i - 1].beaconId;
+      const b = journeySteps[i].beaconId;
+      if (a === b) continue;
+      const key = [a, b].sort().join("||");
+      edgeMap[key] = (edgeMap[key] || 0) + 1;
+    }
+    const edges: JourneyEdge[] = Object.entries(edgeMap).map(([key, trips]) => {
+      const [from, to] = key.split("||");
+      return { from, to, trips };
+    });
+    return {
+      edges,
+      beaconIds,
+      startBeaconId: journeySteps[0].beaconId,
+      endBeaconId: journeySteps[journeySteps.length - 1].beaconId,
+    };
+  }, [journeySteps]);
+
   function getHeatColor(count: number): string {
     if (isFullscreen) {
       return darkenHex(fsSettings.bgColor, 0.15);
@@ -820,7 +1034,7 @@ export default function BeaconHeatmap({
   // In fullscreen, ignore parent selection entirely
   const activeSelectedId = isFullscreen ? null : selectedBeaconId;
   const getPos = (id: string) => (localDragPos && localDragPos.id === id) ? localDragPos : activePositions[id];
-  const hasJourney = journeySteps.length > 1;
+  const hasJourney = !!journeySummary;
 
   // ── STATIC SVG content (memoized — does NOT depend on orbitTick) ──
   const staticSvg = useMemo(() => (
@@ -835,18 +1049,9 @@ export default function BeaconHeatmap({
             </radialGradient>
           );
         })}
-        {journeySteps.map((_, i) => {
-          if (i === 0) return null;
-          const ratio = i / (journeySteps.length - 1 || 1);
-          const r = Math.round(0 + (247 - 0) * ratio);
-          const g = Math.round(212 + (148 - 212) * ratio);
-          const b = Math.round(245 + (29 - 245) * ratio);
-          return (
-            <marker key={`arrow-${i}`} id={`journey-arrow-${i}`} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-              <polygon points="0 0, 8 3, 0 6" fill={`rgb(${r},${g},${b})`} opacity="0.85" />
-            </marker>
-          );
-        })}
+        <marker id="journey-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#00D4F5" opacity="0.85" />
+        </marker>
         {/* Stable clipPaths for PFPs — one per user, reused every frame */}
         {Object.values(orbitingPfps).flat().map((u) => (
           <clipPath key={`pfp-clip-${u.userId}`} id={`pfp-clip-${u.userId}`}>
@@ -880,7 +1085,7 @@ export default function BeaconHeatmap({
 
     </>
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [beaconList, beaconProofCounts, isFullscreen, fsSettings, journeySteps, visibleBeaconIds, fsActiveBeaconIds, orbitingPfps]);
+  ), [beaconList, beaconProofCounts, isFullscreen, fsSettings, visibleBeaconIds, fsActiveBeaconIds, orbitingPfps]);
 
   // ── Interactive SVG layer (transitions, beacons, labels) — NOT memoized to allow smooth drag ──
   const interactiveSvg = (
@@ -909,27 +1114,30 @@ export default function BeaconHeatmap({
         );
       })}
 
-      {/* Journey overlay arrows */}
-      {hasJourney && !(isFullscreen && fsSettings.orbitCenter) && journeySteps.map((step, i) => {
-        if (i === 0) return null;
-        const prev = journeySteps[i - 1];
-        const fromPos = getPos(prev.beaconId); const toPos = getPos(step.beaconId);
-        if (!fromPos || !toPos || prev.beaconId === step.beaconId) return null;
+      {/* Journey overlay — one line per beacon pair with trip count */}
+      {journeySummary && !(isFullscreen && fsSettings.orbitCenter) && journeySummary.edges.map((edge, i) => {
+        const fromPos = getPos(edge.from); const toPos = getPos(edge.to);
+        if (!fromPos || !toPos) return null;
         const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
         const len = Math.sqrt(dx * dx + dy * dy);
-        const nx = -dy / len, ny = dx / len;
-        const curveOffset = 15 + (i % 2 === 0 ? 5 : -5);
-        const mx = (fromPos.x + toPos.x) / 2 + nx * curveOffset;
-        const my = (fromPos.y + toPos.y) / 2 + ny * curveOffset;
-        const ratio = i / (journeySteps.length - 1);
-        const color = `rgb(${Math.round(52 + 199 * ratio)},${Math.round(211 - 65 * ratio)},${Math.round(153 - 93 * ratio)})`;
+        if (len === 0) return null;
+        const thickness = 1.5 + Math.min(edge.trips, 8) * 0.5;
+        const mx = (fromPos.x + toPos.x) / 2;
+        const my = (fromPos.y + toPos.y) / 2;
         return (
-          <g key={`journey-${i}`}>
-            <path d={`M ${fromPos.x} ${fromPos.y} Q ${mx} ${my} ${toPos.x} ${toPos.y}`}
-              fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="6 4" opacity={0.8}
-              markerEnd={`url(#journey-arrow-${i})`} className="animate-dash" />
-            <circle cx={mx} cy={my} r={9} fill={color} opacity={0.9} />
-            <text x={mx} y={my + 0.5} textAnchor="middle" dominantBaseline="central" fill="white" fontSize="8" fontWeight="700">{i}</text>
+          <g key={`journey-edge-${i}`}>
+            <line x1={fromPos.x} y1={fromPos.y} x2={toPos.x} y2={toPos.y}
+              stroke="#00D4F5" strokeWidth={thickness} strokeDasharray="6 4" opacity={0.7}
+              strokeLinecap="round" className="animate-dash" />
+            {edge.trips > 1 && (
+              <>
+                <circle cx={mx} cy={my} r={8} fill="rgba(0,0,0,0.6)" stroke="#00D4F5" strokeWidth={1} />
+                <text x={mx} y={my + 0.5} textAnchor="middle" dominantBaseline="central"
+                  fill="#00D4F5" fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>
+                  {edge.trips}x
+                </text>
+              </>
+            )}
           </g>
         );
       })}
@@ -943,11 +1151,10 @@ export default function BeaconHeatmap({
         const count = beaconProofCounts[b.id] || 0;
         const nodeRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (count / maxCount) * 22;
         const color = getHeatColor(count);
-        const journeyIdx = journeySteps.findIndex((s) => s.beaconId === b.id);
-        const isJourneyStart = hasJourney && journeyIdx === 0;
-        const isJourneyEnd = hasJourney && journeyIdx === journeySteps.length - 1;
-        const isInJourney = journeyIdx >= 0;
-        const dimmed = (hasJourney && !isInJourney) || (!!activeSelectedId && b.id !== activeSelectedId) || (!!filteredBeaconIds && !filteredBeaconIds.includes(b.id));
+        const isInJourney = journeySummary ? journeySummary.beaconIds.has(b.id) : false;
+        const isJourneyStart = journeySummary ? b.id === journeySummary.startBeaconId : false;
+        const isJourneyEnd = journeySummary ? b.id === journeySummary.endBeaconId : false;
+        const dimmed = (!!journeySummary && !isInJourney) || (!!activeSelectedId && b.id !== activeSelectedId) || (!!filteredBeaconIds && !filteredBeaconIds.includes(b.id));
         return (
           <g key={b.id} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
             onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.25 : 1}>
@@ -960,13 +1167,13 @@ export default function BeaconHeatmap({
             <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
               fill={isFullscreen ? fsSettings.textColor : "white"} fontSize={Math.max(6, nodeRadius * 0.4)}
               fontWeight="700" style={{ pointerEvents: "none" }}>{truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 10)}</text>
-            {isInJourney && (
+            {(isJourneyStart || isJourneyEnd) && (
               <>
                 <circle cx={pos.x + nodeRadius * 0.7} cy={pos.y - nodeRadius * 0.7} r={8}
-                  fill={isJourneyStart ? "#00D4F5" : isJourneyEnd ? "#F7941D" : "#0095FF"} />
+                  fill={isJourneyStart ? "#00D4F5" : "#F7941D"} />
                 <text x={pos.x + nodeRadius * 0.7} y={pos.y - nodeRadius * 0.7 + 0.5} textAnchor="middle" dominantBaseline="central"
                   fill="white" fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>
-                  {isJourneyStart ? "S" : isJourneyEnd ? "E" : journeyIdx + 1}
+                  {isJourneyStart ? "S" : "E"}
                 </text>
               </>
             )}
@@ -1701,7 +1908,7 @@ export default function BeaconHeatmap({
         </span>
         <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>
           {beaconList.length} beacon{beaconList.length !== 1 ? "s" : ""}
-          {hasJourney && ` \u00b7 ${journeySteps.length} steps`}
+          {journeySummary && ` \u00b7 ${journeySummary.beaconIds.size} zones \u00b7 ${journeySummary.edges.reduce((s, e) => s + e.trips, 0)} trips`}
         </span>
       </div>
       {!hasJourney && (
@@ -1723,13 +1930,198 @@ export default function BeaconHeatmap({
           {!isFullscreen && (
             <svg ref={svgRef} viewBox="0 0 400 400" className="w-full h-full" preserveAspectRatio="xMidYMid meet"
               style={{ cursor: dragging ? "grabbing" : "default" }}>
+              {/* Glow defs always needed */}
               {staticSvg}
-              {interactiveSvg}
-              {animatedPfps}
+              {/* PFP mode: simplified beacon nodes + moving user avatars */}
+              {isPlaybackActive && viewMode === "pfps" ? (<>
+                {beaconList.map((b) => {
+                  const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : (positions[b.id]);
+                  if (!pos) return null;
+                  const count = beaconProofCounts[b.id] || 0;
+                  const maxC = Math.max(1, ...Object.values(beaconProofCounts));
+                  const nodeRadius = 18 + (count / maxC) * 22;
+                  return (
+                    <g key={`pb-${b.id}`} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
+                      onMouseDown={(e) => handleMouseDown(b.id, e)}>
+                      <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill="rgba(255,255,255,0.04)"
+                        stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
+                      <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
+                        fill="white" fontSize={Math.max(6, nodeRadius * 0.35)}
+                        fontWeight="700" style={{ pointerEvents: "none" }}>
+                        {(names[b.id] || b.name || b.id.substring(0, 10)).substring(0, 10)}
+                      </text>
+                      <text x={pos.x} y={pos.y + nodeRadius + 8} textAnchor="middle"
+                        fill="rgba(255,255,255,0.4)" fontSize="7" fontWeight="600" style={{ pointerEvents: "none" }}>
+                        {count}
+                      </text>
+                    </g>
+                  );
+                })}
+                {movingPfps && movingPfps.map((p) => {
+                  const r = 7;
+                  return (
+                    <g key={`mpfp-${p.userId}`}>
+                      <defs>
+                        <clipPath id={`mpfp-clip-${p.userId}`}>
+                          <circle cx={p.x} cy={p.y} r={r} />
+                        </clipPath>
+                      </defs>
+                      {p.moving && (<>
+                        {/* Travel glow */}
+                        <circle cx={p.x} cy={p.y} r={r + 4} fill="rgba(0,149,255,0.08)" />
+                        <circle cx={p.x} cy={p.y} r={r + 2} fill="none" stroke="#0095FF" strokeWidth={1} opacity={0.6} />
+                      </>)}
+                      <circle cx={p.x} cy={p.y} r={r + 0.5} fill="rgba(0,0,0,0.6)" />
+                      <image href={p.pic} x={p.x - r} y={p.y - r} width={r * 2} height={r * 2}
+                        clipPath={`url(#mpfp-clip-${p.userId})`} style={{ pointerEvents: "none" }} />
+                    </g>
+                  );
+                })}
+              </>) : (<>
+                {/* Default: transition lines, beacon nodes, labels, orbiting PFPs */}
+                {interactiveSvg}
+                {animatedPfps}
+              </>)}
             </svg>
           )}
         </div>
       </div>
+
+      {/* ═══ TIMELINE PLAYER ═══ */}
+      {hasTimeline && !isFullscreen && (
+        <div
+          className="flex-shrink-0 flex items-center gap-2 px-3"
+          style={{
+            height: 40,
+            background: "linear-gradient(180deg, #2a2a32 0%, #222228 100%)",
+            borderTop: "1px solid rgba(0,0,0,0.4)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}
+        >
+          {/* Play / Pause */}
+          <button
+            onClick={isPlaying ? handlePause : handlePlay}
+            className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+            style={{
+              background: isPlaying
+                ? "linear-gradient(180deg, #444 0%, #333 100%)"
+                : "linear-gradient(180deg, #0095FF 0%, #0077CC 100%)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+            }}
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="white">
+                <rect x="1.5" y="1" width="2.5" height="8" rx="0.5" />
+                <rect x="6" y="1" width="2.5" height="8" rx="0.5" />
+              </svg>
+            ) : (
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="white">
+                <path d="M2 1L9 5L2 9V1Z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Stop */}
+          <button
+            onClick={handleStop}
+            className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+            style={{
+              background: "linear-gradient(180deg, #363640 0%, #2a2a32 100%)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+            }}
+            title="Stop (live)"
+          >
+            <svg width="8" height="8" viewBox="0 0 10 10" fill="#9a9aa6">
+              <rect x="1.5" y="1.5" width="7" height="7" rx="1" />
+            </svg>
+          </button>
+
+          {/* View mode toggle */}
+          <div className="flex gap-0 flex-shrink-0 rounded overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+            <button
+              onClick={() => setViewMode("lines")}
+              className="px-1.5 py-0.5 text-[7px] font-bold"
+              style={{
+                background: viewMode === "lines" ? "rgba(0,149,255,0.2)" : "transparent",
+                color: viewMode === "lines" ? "#0095FF" : "var(--text-tertiary)",
+              }}
+              title="Lines & numbers"
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="2" y1="2" x2="10" y2="10" /><line x1="2" y1="10" x2="10" y2="2" />
+                <circle cx="2" cy="2" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" />
+                <circle cx="2" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="2" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode("pfps")}
+              className="px-1.5 py-0.5 text-[7px] font-bold"
+              style={{
+                background: viewMode === "pfps" ? "rgba(0,149,255,0.2)" : "transparent",
+                color: viewMode === "pfps" ? "#0095FF" : "var(--text-tertiary)",
+              }}
+              title="PFP avatars"
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
+                <circle cx="6" cy="4" r="2.5" /><path d="M2 11c0-2.2 1.8-4 4-4s4 1.8 4 4" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Scrubber */}
+          <div className="flex-1 relative flex items-center" style={{ height: 18 }}>
+            <div className="absolute inset-x-0 rounded-full"
+              style={{ height: 3, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.4)" }} />
+            <div className="absolute rounded-full"
+              style={{
+                height: 3, top: "50%", transform: "translateY(-50%)", left: 0,
+                width: `${eventEndTime! > eventStartTime! ? ((localPlaybackTime - eventStartTime!) / (eventEndTime! - eventStartTime!)) * 100 : 0}%`,
+                background: "linear-gradient(90deg, #0095FF, #00C6FF)", boxShadow: "0 0 6px rgba(0,149,255,0.4)",
+              }} />
+            <input type="range" min={eventStartTime} max={eventEndTime} step={1} value={localPlaybackTime} onChange={handleScrub}
+              className="timeline-scrubber"
+              style={{ width: "100%", position: "relative", zIndex: 1, appearance: "none", WebkitAppearance: "none", background: "transparent", height: 18, cursor: "pointer" }} />
+          </div>
+
+          {/* Time display */}
+          <span className="text-[8px] font-mono font-bold flex-shrink-0" style={{ color: isPlaybackActive ? "#0095FF" : "var(--text-tertiary)" }}>
+            {new Date(localPlaybackTime * 1000).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          </span>
+
+          {/* Speed buttons */}
+          <div className="flex gap-0.5 flex-shrink-0">
+            {[10, 50, 100, 1000, 5000].map((s) => (
+              <button key={s} onClick={() => setPlaySpeed(s)}
+                className="px-1 py-0.5 rounded text-[7px] font-bold"
+                style={{
+                  background: playSpeed === s ? "linear-gradient(180deg, #0095FF 0%, #0077CC 100%)" : "transparent",
+                  color: playSpeed === s ? "#fff" : "var(--text-tertiary)",
+                  border: playSpeed === s ? "1px solid rgba(0,149,255,0.4)" : "1px solid transparent",
+                }}>
+                {s >= 1000 ? `${s/1000}k` : s}x
+              </button>
+            ))}
+          </div>
+
+          <style>{`
+            .timeline-scrubber::-webkit-slider-thumb {
+              -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%;
+              background: linear-gradient(180deg, #fff 0%, #ccc 100%); border: 1px solid rgba(0,0,0,0.3);
+              box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: pointer;
+            }
+            .timeline-scrubber::-moz-range-thumb {
+              width: 10px; height: 10px; border-radius: 50%;
+              background: linear-gradient(180deg, #fff 0%, #ccc 100%); border: 1px solid rgba(0,0,0,0.3);
+              box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: pointer;
+            }
+            .timeline-scrubber::-webkit-slider-runnable-track { height: 3px; background: transparent; }
+            .timeline-scrubber::-moz-range-track { height: 3px; background: transparent; }
+          `}</style>
+        </div>
+      )}
 
       {/* Rename overlay */}
       {editingBeacon && (
@@ -1744,7 +2136,7 @@ export default function BeaconHeatmap({
       {!isFullscreen && (
         <button data-nav-zone="2" onClick={() => setShowSettings(!showSettings)}
           style={{
-            position: "absolute", bottom: 12, right: 12, zIndex: 20,
+            position: "absolute", bottom: hasTimeline ? 52 : 12, right: 12, zIndex: 20,
             width: 24, height: 24, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
             background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52",
             cursor: "pointer", opacity: showSettings ? 1 : 0.5,

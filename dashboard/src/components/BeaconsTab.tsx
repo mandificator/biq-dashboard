@@ -3,6 +3,16 @@
 import React from "react";
 import { Beacon, Proof, Profile } from "@/types";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+const PRESENCE_THRESHOLD = 30 * 60; // 30 minutes in seconds
 
 const Avatar = React.memo(function Avatar({ src, name, size = 32 }: { src?: string; name: string; size?: number }) {
   const [failed, setFailed] = useState(false);
@@ -222,6 +232,18 @@ function ClusterDropdown({ value, onChange, allLabel, options }: {
   );
 }
 
+// Mini sparkline tooltip
+const miniTooltipStyle = {
+  background: "linear-gradient(180deg, #2a2a30 0%, #222226 100%)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 6,
+  color: "#e8e8ec",
+  fontSize: 9,
+  fontFamily: "var(--font-space-mono), monospace",
+  padding: "4px 8px",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+};
+
 export default function BeaconsTab({
   beacons,
   beaconNames,
@@ -252,6 +274,26 @@ export default function BeaconsTab({
     }
     const counts: Record<string, number> = {};
     for (const [bid, set] of Object.entries(map)) counts[bid] = set.size;
+    return counts;
+  }, [proofs]);
+
+  // Feature 2: Currently present per beacon
+  const beaconCurrentlyPresent = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000);
+    // Find each user's last proof
+    const userLastProof: Record<string, Proof> = {};
+    for (const p of proofs) {
+      if (!userLastProof[p.userId] || p.time > userLastProof[p.userId].time) {
+        userLastProof[p.userId] = p;
+      }
+    }
+    // Count per beacon: users whose last proof is at this beacon AND recent
+    const counts: Record<string, number> = {};
+    for (const p of Object.values(userLastProof)) {
+      if (now - p.time < PRESENCE_THRESHOLD) {
+        counts[p.beaconId] = (counts[p.beaconId] || 0) + 1;
+      }
+    }
     return counts;
   }, [proofs]);
 
@@ -331,6 +373,113 @@ export default function BeaconsTab({
     return Math.round(dwells.reduce((s, d) => s + d, 0) / dwells.length);
   }, [selectedBeaconId, visitors]);
 
+  // Feature 1: Activity timeline (10-min buckets) for selected beacon
+  const activityTimeline = useMemo(() => {
+    if (!selectedBeaconId) return [];
+    const beaconProofs = proofs.filter((p) => p.beaconId === selectedBeaconId);
+    if (beaconProofs.length === 0) return [];
+
+    const sorted = [...beaconProofs].sort((a, b) => a.time - b.time);
+    const bucketSize = 600; // 10 min
+    const minBucket = Math.floor(sorted[0].time / bucketSize) * bucketSize;
+    const maxBucket = Math.floor(sorted[sorted.length - 1].time / bucketSize) * bucketSize;
+
+    const buckets: Record<number, number> = {};
+    for (let t = minBucket; t <= maxBucket; t += bucketSize) {
+      buckets[t] = 0;
+    }
+    for (const p of sorted) {
+      const bucket = Math.floor(p.time / bucketSize) * bucketSize;
+      buckets[bucket] = (buckets[bucket] || 0) + 1;
+    }
+
+    return Object.entries(buckets)
+      .map(([time, count]) => ({
+        time: Number(time),
+        count,
+        label: new Date(Number(time) * 1000).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit" }),
+      }))
+      .sort((a, b) => a.time - b.time);
+  }, [selectedBeaconId, proofs]);
+
+  // Feature 3: Flow analysis — directional transitions for selected beacon
+  const flowData = useMemo(() => {
+    if (!selectedBeaconId) return { incoming: [], outgoing: [] };
+
+    // Build per-user beacon timeline
+    const userProofs: Record<string, Proof[]> = {};
+    for (const p of proofs) {
+      if (!userProofs[p.userId]) userProofs[p.userId] = [];
+      userProofs[p.userId].push(p);
+    }
+
+    const incomingCounts: Record<string, number> = {};
+    const outgoingCounts: Record<string, number> = {};
+
+    for (const uid of Object.keys(userProofs)) {
+      const sorted = userProofs[uid].sort((a, b) => a.time - b.time);
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].beaconId === sorted[i - 1].beaconId) continue;
+        const from = sorted[i - 1].beaconId;
+        const to = sorted[i].beaconId;
+        if (to === selectedBeaconId) {
+          incomingCounts[from] = (incomingCounts[from] || 0) + 1;
+        }
+        if (from === selectedBeaconId) {
+          outgoingCounts[to] = (outgoingCounts[to] || 0) + 1;
+        }
+      }
+    }
+
+    const toFlowList = (counts: Record<string, number>) =>
+      Object.entries(counts)
+        .map(([beaconId, count]) => ({
+          beaconId,
+          name: beacons[beaconId]
+            ? getBeaconDisplayName(beacons[beaconId], beaconNames)
+            : beaconId.substring(0, 10),
+          count,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+    return {
+      incoming: toFlowList(incomingCounts),
+      outgoing: toFlowList(outgoingCounts),
+    };
+  }, [selectedBeaconId, proofs, beacons, beaconNames]);
+
+  // Feature 4: Retention — engaged vs bounce
+  const retention = useMemo(() => {
+    if (!selectedBeaconId || visitors.length === 0) return { engaged: 0, bounce: 0 };
+    let engaged = 0;
+    let bounce = 0;
+    for (const v of visitors) {
+      const dwellMin = (v.lastVisit - v.firstVisit) / 60;
+      if (dwellMin >= 10) engaged++;
+      else if (dwellMin < 5) bounce++;
+    }
+    return {
+      engaged: Math.round((engaged / visitors.length) * 100),
+      bounce: Math.round((bounce / visitors.length) * 100),
+    };
+  }, [selectedBeaconId, visitors]);
+
+  // Feature 5: Peak hour
+  const peakHour = useMemo(() => {
+    if (!selectedBeaconId || activityTimeline.length === 0) return { label: "—", count: 0 };
+    let max = activityTimeline[0];
+    for (const pt of activityTimeline) {
+      if (pt.count > max.count) max = pt;
+    }
+    return { label: max.label, count: max.count };
+  }, [selectedBeaconId, activityTimeline]);
+
+  // Max flow count for bar widths
+  const maxFlowCount = useMemo(() => {
+    const allCounts = [...flowData.incoming, ...flowData.outgoing].map((f) => f.count);
+    return Math.max(1, ...allCounts);
+  }, [flowData]);
+
   return (
     <div className="flex gap-3 h-full">
       {/* Beacon list */}
@@ -360,6 +509,7 @@ export default function BeaconsTab({
             {displayBeacons.map((b) => {
               const isSelected = selectedBeaconId === b.id;
               const cluster = beaconClusterMap[b.id];
+              const presentCount = beaconCurrentlyPresent[b.id] || 0;
               return (
                 <button
                   key={b.id}
@@ -385,8 +535,21 @@ export default function BeaconsTab({
                     {(beaconProofCounts[b.id] || 0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
-                      {getBeaconDisplayName(b, beaconNames)}
+                    <div className="text-[10px] font-bold truncate flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
+                      <span className="truncate">{getBeaconDisplayName(b, beaconNames)}</span>
+                      {presentCount > 0 && (
+                        <span
+                          className="flex-shrink-0 px-1 py-0 rounded text-[7px] font-bold"
+                          style={{
+                            background: "rgba(76, 175, 80, 0.2)",
+                            color: "#4CAF50",
+                            border: "1px solid rgba(76, 175, 80, 0.3)",
+                            lineHeight: "14px",
+                          }}
+                        >
+                          {presentCount} now
+                        </span>
+                      )}
                     </div>
                     <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
                       {b.type} &middot; {uniqueVisitors[b.id] || 0} visitors
@@ -453,56 +616,180 @@ export default function BeaconsTab({
               )}
             </div>
 
-            {/* Stats */}
-            <div
-              className="grid grid-cols-4 gap-2 px-3 py-2"
-              style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
-            >
-              {[
-                { label: "Total Proofs", value: String(beaconProofCounts[selectedBeacon.id] || 0) },
-                { label: "Unique Visitors", value: String(uniqueVisitors[selectedBeacon.id] || 0) },
-                { label: "Transitions", value: String(transitionCount) },
-                { label: "Avg Dwell", value: avgDwell > 0 ? `${avgDwell}m` : "—" },
-              ].map((s) => (
-                <div key={s.label} className="skeuo-inset px-2 py-1.5 rounded-md">
-                  <div className="text-[8px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
-                  <div className="text-[10px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Visitors */}
-            <div className="flex-1 overflow-hidden flex flex-col px-3 py-2">
-              <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
-                Visitors ({visitors.length})
+            {/* Content area — flex column fills remaining height */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {/* Stats grid — 6 stats in 3x2 */}
+              <div
+                className="grid grid-cols-3 gap-2 px-3 py-2"
+                style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
+              >
+                {[
+                  { label: "Total Proofs", value: String(beaconProofCounts[selectedBeacon.id] || 0) },
+                  { label: "Unique Visitors", value: String(uniqueVisitors[selectedBeacon.id] || 0) },
+                  { label: "Transitions", value: String(transitionCount) },
+                  { label: "Avg Dwell", value: avgDwell > 0 ? `${avgDwell}m` : "—" },
+                  { label: "Peak", value: peakHour.count > 0 ? `${peakHour.label} (${peakHour.count})` : "—" },
+                  { label: "Retention", value: retention.engaged > 0 || retention.bounce > 0
+                    ? `${retention.engaged}% eng · ${retention.bounce}% bnc`
+                    : "—" },
+                ].map((s) => (
+                  <div key={s.label} className="skeuo-inset px-2 py-1.5 rounded-md">
+                    <div className="text-[8px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
+                    <div className="text-[10px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
+                  </div>
+                ))}
               </div>
-              <div className="flex-1 overflow-y-auto skeuo-inset p-1.5">
-                <div className="space-y-0.5">
-                  {visitors.map((v) => (
-                    <div
-                      key={v.userId}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md"
-                    >
-                      <Avatar
-                        src={v.profile?.profilePicture}
-                        name={v.profile?.displayName || v.userId}
-                        size={24}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
-                          {v.profile?.displayName || v.userId.substring(0, 10) + "..."}
+
+              {/* Feature 1: Activity chart */}
+              {activityTimeline.length > 1 && (
+                <div
+                  className="px-3 py-2 flex-shrink-0"
+                  style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
+                >
+                  <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
+                    Activity
+                  </div>
+                  <div className="skeuo-inset rounded-md overflow-hidden" style={{ height: 280 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={activityTimeline} margin={{ top: 6, right: 8, bottom: 2, left: -20 }}>
+                        <defs>
+                          <linearGradient id="beaconActivityGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#0095FF" stopOpacity={0.3} />
+                            <stop offset="100%" stopColor="#0095FF" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="label" tick={{ fill: "#66666e", fontSize: 8 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fill: "#66666e", fontSize: 8 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={miniTooltipStyle}
+                          labelStyle={{ color: "#9a9aa6", fontSize: 8 }}
+                          itemStyle={{ color: "#e8e8ec", fontSize: 9 }}
+                          cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="count"
+                          name="Proofs"
+                          stroke="#0095FF"
+                          fill="url(#beaconActivityGrad)"
+                          strokeWidth={1.5}
+                          dot={false}
+                          activeDot={{ r: 3, fill: "#0095FF", stroke: "#fff", strokeWidth: 1 }}
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Feature 3: Flow analysis */}
+              {(flowData.incoming.length > 0 || flowData.outgoing.length > 0) && (
+                <div
+                  className="px-3 py-2 flex-shrink-0"
+                  style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
+                >
+                  <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
+                    Flow
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Incoming */}
+                    <div className="skeuo-inset rounded-md p-1.5">
+                      <div className="text-[7px] font-bold uppercase tracking-wider mb-1" style={{ color: "#4CAF50" }}>
+                        Incoming
+                      </div>
+                      {flowData.incoming.length > 0 ? (
+                        <div className="space-y-1">
+                          {flowData.incoming.slice(0, 8).map((f) => (
+                            <div key={f.beaconId}>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[9px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
+                                  {f.name}
+                                </span>
+                                <span className="text-[8px] font-bold flex-shrink-0" style={{ color: "#4CAF50" }}>
+                                  {f.count}
+                                </span>
+                              </div>
+                              <div className="w-full h-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${Math.max(4, (f.count / maxFlowCount) * 100)}%`, background: "#4CAF50", opacity: 0.7 }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
-                          First: {formatTs(v.firstVisit)} &middot; {v.proofCount} proof{v.proofCount !== 1 ? "s" : ""}
+                      ) : (
+                        <div className="text-[8px] py-1" style={{ color: "var(--text-tertiary)" }}>None</div>
+                      )}
+                    </div>
+                    {/* Outgoing */}
+                    <div className="skeuo-inset rounded-md p-1.5">
+                      <div className="text-[7px] font-bold uppercase tracking-wider mb-1" style={{ color: "#F7941D" }}>
+                        Outgoing
+                      </div>
+                      {flowData.outgoing.length > 0 ? (
+                        <div className="space-y-1">
+                          {flowData.outgoing.slice(0, 8).map((f) => (
+                            <div key={f.beaconId}>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[9px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
+                                  {f.name}
+                                </span>
+                                <span className="text-[8px] font-bold flex-shrink-0" style={{ color: "#F7941D" }}>
+                                  {f.count}
+                                </span>
+                              </div>
+                              <div className="w-full h-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${Math.max(4, (f.count / maxFlowCount) * 100)}%`, background: "#F7941D", opacity: 0.7 }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[8px] py-1" style={{ color: "var(--text-tertiary)" }}>None</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Visitors — fills remaining height */}
+              <div className="px-3 py-2 flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+                  Visitors ({visitors.length})
+                </div>
+                <div className="skeuo-inset p-1.5 flex-1 min-h-0 overflow-y-auto">
+                  <div className="space-y-0.5">
+                    {visitors.map((v) => (
+                      <div
+                        key={v.userId}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md"
+                      >
+                        <Avatar
+                          src={v.profile?.profilePicture}
+                          name={v.profile?.displayName || v.userId}
+                          size={24}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                            {v.profile?.displayName || v.userId.substring(0, 10) + "..."}
+                          </div>
+                          <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
+                            First: {formatTs(v.firstVisit)} &middot; {v.proofCount} proof{v.proofCount !== 1 ? "s" : ""}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                  {visitors.length === 0 && (
-                    <div className="text-[10px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>
-                      No visitors recorded
-                    </div>
-                  )}
+                    ))}
+                    {visitors.length === 0 && (
+                      <div className="text-[10px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>
+                        No visitors recorded
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -67,20 +67,20 @@ export function processAnalytics(data: AnalyticsResponse): ProcessedData {
     }
   );
 
-  // Check-in timeline (first proof per user, bucketed by hour)
+  // Check-in timeline (first proof per user, bucketed by 10 min)
   // Check-out timeline: only users who left (last proof > 30 min ago, or event over)
-  const checkInTimes: number[] = [];
-  const checkOutTimes: number[] = [];
+  const checkInEntries: { time: number; userId: string }[] = [];
+  const checkOutEntries: { time: number; userId: string }[] = [];
   for (const uid of Object.keys(userProofs)) {
-    checkInTimes.push(userProofs[uid][0].time);
+    checkInEntries.push({ time: userProofs[uid][0].time, userId: uid });
     const lastProofTime = userProofs[uid][userProofs[uid].length - 1].time;
     if (isEventOver || now - lastProofTime >= PRESENCE_THRESHOLD) {
-      checkOutTimes.push(lastProofTime);
+      checkOutEntries.push({ time: lastProofTime, userId: uid });
     }
   }
 
-  const checkInTimeline = bucketByHour(checkInTimes);
-  const checkOutTimeline = bucketByHour(checkOutTimes);
+  const checkInTimeline = bucketByInterval(checkInEntries);
+  const checkOutTimeline = bucketByInterval(checkOutEntries);
 
   // Dwell times
   const dwellTimes = Object.keys(userProofs).map((uid) => {
@@ -93,18 +93,21 @@ export function processAnalytics(data: AnalyticsResponse): ProcessedData {
   const userDetails: UserDetail[] = Object.keys(userProofs).map((uid) => {
     const ups = userProofs[uid];
     const beaconsVisited = [...new Set(ups.map((p) => p.beaconId))];
+    const lastProofTime = ups[ups.length - 1].time;
+    const isPresent = !isEventOver && (now - lastProofTime < PRESENCE_THRESHOLD);
     return {
       userId: uid,
       profile: profiles[uid] || null,
       firstProof: ups[0].time,
-      lastProof: ups[ups.length - 1].time,
-      dwellMinutes: Math.round((ups[ups.length - 1].time - ups[0].time) / 60),
+      lastProof: lastProofTime,
+      dwellMinutes: Math.round((lastProofTime - ups[0].time) / 60),
       beaconsVisited,
       proofCount: ups.length,
       beaconTimeline: ups.map((p) => ({
         beaconId: p.beaconId,
         time: p.time,
       })),
+      status: isPresent ? "present" : "left",
     };
   });
 
@@ -131,31 +134,32 @@ export function processAnalytics(data: AnalyticsResponse): ProcessedData {
   };
 }
 
-function bucketByHour(
-  times: number[]
-): { time: number; count: number }[] {
-  if (times.length === 0) return [];
-  const sorted = [...times].sort((a, b) => a - b);
-  const minTime = sorted[0];
-  const maxTime = sorted[sorted.length - 1];
+function bucketByInterval(
+  entries: { time: number; userId: string }[]
+): { time: number; count: number; userIds: string[] }[] {
+  if (entries.length === 0) return [];
+  const sorted = [...entries].sort((a, b) => a.time - b.time);
+  const minTime = sorted[0].time;
+  const maxTime = sorted[sorted.length - 1].time;
 
-  // Bucket into 1-hour intervals
-  const bucketSize = 3600;
+  // Bucket into 10-minute intervals
+  const bucketSize = 600;
   const startBucket = Math.floor(minTime / bucketSize) * bucketSize;
   const endBucket = Math.floor(maxTime / bucketSize) * bucketSize;
 
-  const buckets: Record<number, number> = {};
+  const buckets: Record<number, string[]> = {};
   for (let t = startBucket; t <= endBucket; t += bucketSize) {
-    buckets[t] = 0;
+    buckets[t] = [];
   }
 
-  for (const t of sorted) {
-    const bucket = Math.floor(t / bucketSize) * bucketSize;
-    buckets[bucket] = (buckets[bucket] || 0) + 1;
+  for (const e of sorted) {
+    const bucket = Math.floor(e.time / bucketSize) * bucketSize;
+    if (!buckets[bucket]) buckets[bucket] = [];
+    buckets[bucket].push(e.userId);
   }
 
   return Object.entries(buckets)
-    .map(([time, count]) => ({ time: Number(time), count }))
+    .map(([time, userIds]) => ({ time: Number(time), count: userIds.length, userIds }))
     .sort((a, b) => a.time - b.time);
 }
 

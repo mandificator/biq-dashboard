@@ -75,8 +75,8 @@ export interface ProcessedData {
   avgDwellMinutes: number;
   beaconProofCounts: Record<string, number>;
   userBeaconTransitions: { from: string; to: string; count: number }[];
-  checkInTimeline: { time: number; count: number }[];
-  checkOutTimeline: { time: number; count: number }[];
+  checkInTimeline: { time: number; count: number; userIds: string[] }[];
+  checkOutTimeline: { time: number; count: number; userIds: string[] }[];
   dwellTimes: { userId: string; minutes: number }[];
   userDetails: UserDetail[];
 }
@@ -90,4 +90,5 @@ export interface UserDetail {
   beaconsVisited: string[];
   proofCount: number;
   beaconTimeline: { beaconId: string; time: number }[];
+  status: "present" | "left";
 }

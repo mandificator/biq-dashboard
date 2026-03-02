@@ -6,7 +6,7 @@ import { processAnalytics, mergeAnalytics } from "@/lib/processData";
 import StatsCards from "@/components/StatsCards";
 import BeaconHeatmap from "@/components/BeaconHeatmap";
 import { CheckInChart, CheckOutChart, DwellTimeChart } from "@/components/Charts";
-import UsersTab from "@/components/UsersTab";
+import UsersTab, { UserDetailPanel } from "@/components/UsersTab";
 import BeaconsTab from "@/components/BeaconsTab";
 
 const REFRESH_INTERVAL = 30_000;
@@ -115,6 +115,7 @@ export default function Home() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedBeaconId, setSelectedBeaconId] = useState<string | null>(null);
   const [filteredBeaconIds, setFilteredBeaconIds] = useState<string[] | null>(null);
+  const [playbackTime, setPlaybackTime] = useState<number | null>(null);
 
   // Journey for selected user
   const selectedUserJourney = useMemo(() => {
@@ -306,6 +307,41 @@ export default function Home() {
     eventName: processed.event.name,
   } : null, [processed, beaconPositions, handlePositionChange, beaconNames, handleNameChange]);
 
+  // Playback-filtered data for BeaconHeatmap
+  const playbackMapOverrides = useMemo(() => {
+    if (playbackTime == null || !processed) return null;
+
+    const filteredProofs = processed.proofs.filter((p) => p.time <= playbackTime);
+
+    // Recount per beacon
+    const counts: Record<string, number> = {};
+    for (const p of filteredProofs) {
+      counts[p.beaconId] = (counts[p.beaconId] || 0) + 1;
+    }
+
+    // Recompute transitions (same sorted-key logic as processData.ts)
+    const userProofs: Record<string, typeof filteredProofs> = {};
+    for (const p of filteredProofs) {
+      if (!userProofs[p.userId]) userProofs[p.userId] = [];
+      userProofs[p.userId].push(p);
+    }
+    const transitionMap: Record<string, number> = {};
+    for (const uid of Object.keys(userProofs)) {
+      const ups = userProofs[uid].sort((a, b) => a.time - b.time);
+      for (let i = 1; i < ups.length; i++) {
+        if (ups[i].beaconId === ups[i - 1].beaconId) continue;
+        const key = [ups[i - 1].beaconId, ups[i].beaconId].sort().join("||");
+        transitionMap[key] = (transitionMap[key] || 0) + 1;
+      }
+    }
+    const transitions = Object.entries(transitionMap).map(([key, count]) => {
+      const [from, to] = key.split("||");
+      return { from, to, count };
+    });
+
+    return { beaconProofCounts: counts, transitions, proofs: filteredProofs };
+  }, [playbackTime, processed]);
+
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "var(--bg-texture)" }}>
       {/* Header — raised toolbar */}
@@ -455,13 +491,13 @@ export default function Home() {
                 {activeTab === "overview" && (
                   <>
                     <div className="flex-1 min-h-0">
-                      <CheckInChart data={processed.checkInTimeline} />
+                      <CheckInChart data={processed.checkInTimeline} profiles={processed.profiles} onClickUser={(uid) => { setSelectedUserId(uid); setActiveTab("users"); }} />
                     </div>
                     <div className="flex-1 min-h-0">
-                      <CheckOutChart data={processed.checkOutTimeline} />
+                      <CheckOutChart data={processed.checkOutTimeline} profiles={processed.profiles} onClickUser={(uid) => { setSelectedUserId(uid); setActiveTab("users"); }} />
                     </div>
                     <div className="flex-1 min-h-0">
-                      <DwellTimeChart data={processed.dwellTimes} profiles={processed.profiles} />
+                      <DwellTimeChart data={processed.dwellTimes} profiles={processed.profiles} onClickUser={(uid) => { setSelectedUserId(uid); setActiveTab("users"); }} />
                     </div>
                   </>
                 )}
@@ -475,6 +511,8 @@ export default function Home() {
                     onSelectUser={setSelectedUserId}
                     eventStartTime={processed.event.startTime}
                     eventEndTime={processed.event.endTime}
+                    dwellTimes={processed.dwellTimes}
+                    profiles={processed.profiles}
                   />
                   </div>
                 )}
@@ -495,15 +533,36 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Right side — beacon map, same position both tabs */}
-              <div className="w-[40%] flex-shrink-0 h-full">
-                <BeaconHeatmap
-                  {...beaconMapProps}
-                  selectedUserJourney={activeTab === "users" ? selectedUserJourney : undefined}
-                  selectedBeaconId={activeTab === "beacons" ? selectedBeaconId : undefined}
-                  onSelectBeacon={activeTab === "beacons" ? setSelectedBeaconId : undefined}
-                  filteredBeaconIds={activeTab === "beacons" ? filteredBeaconIds : undefined}
-                />
+              {/* Right side — user detail (users tab) + beacon map */}
+              <div className="w-[40%] flex-shrink-0 h-full flex flex-col gap-3">
+                {activeTab === "users" && (() => {
+                  const selectedUser = selectedUserId ? processed.userDetails.find(u => u.userId === selectedUserId) : null;
+                  return selectedUser ? (
+                    <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} />
+                  ) : (
+                    <div className="skeuo-panel flex items-center justify-center" style={{ minHeight: 80 }}>
+                      <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
+                    </div>
+                  );
+                })()}
+                <div className="flex-1 min-h-0">
+                  <BeaconHeatmap
+                    {...beaconMapProps}
+                    {...(activeTab === "beacons" && playbackMapOverrides ? {
+                      beaconProofCounts: playbackMapOverrides.beaconProofCounts,
+                      transitions: playbackMapOverrides.transitions,
+                      proofs: playbackMapOverrides.proofs,
+                    } : {})}
+                    selectedUserJourney={activeTab === "users" ? selectedUserJourney : undefined}
+                    selectedBeaconId={activeTab === "beacons" ? selectedBeaconId : undefined}
+                    onSelectBeacon={activeTab === "beacons" ? setSelectedBeaconId : undefined}
+                    filteredBeaconIds={activeTab === "beacons" ? filteredBeaconIds : undefined}
+                    eventStartTime={processed.event.startTime}
+                    eventEndTime={processed.event.endTime}
+                    onPlaybackTime={setPlaybackTime}
+                    playbackTime={playbackTime}
+                  />
+                </div>
               </div>
             </div>
           </div>
