@@ -92,3 +92,51 @@ export interface UserDetail {
   beaconTimeline: { beaconId: string; time: number }[];
   status: "present" | "left";
 }
+
+export interface EventListItem {
+  id: string;
+  name: string;
+  image: string;
+  organizerId: string[];
+  startTime: number;
+  endTime: number;
+  locations: {
+    id: string;
+    name: string;
+    address: string;
+  }[];
+  visibility: string;
+  isPublic?: boolean;
+  isGated: boolean;
+}
+
+export interface OrganizerInfo {
+  id: string;
+  name: string;
+  logo: string;
+  description: string;
+  status?: string;
+}
+
+export interface CrossEventAnalysis {
+  sharedUsers: {
+    userId: string;
+    eventIds: string[];
+    totalProofs: number;
+    totalDwell: number;
+  }[];
+  eventMetrics: {
+    eventId: string;
+    eventName: string;
+    totalAttendees: number;
+    avgDwellMinutes: number;
+    uniqueBeacons: number;
+    totalProofs: number;
+    peakConcurrent: number;
+  }[];
+  overlapMatrix: {
+    eventA: string;
+    eventB: string;
+    sharedCount: number;
+  }[];
+}
