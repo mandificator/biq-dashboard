@@ -448,21 +448,30 @@ export default function EventPage() {
                     </div>
                   </>
                 )}
-                {activeTab === "users" && (
-                  <div className="flex-1 min-h-0">
-                    <UsersTab
-                      users={processed.userDetails}
-                      beacons={processed.beacons}
-                      beaconNames={beaconNames}
-                      selectedUserId={selectedUserId}
-                      onSelectUser={setSelectedUserId}
-                      eventStartTime={processed.event.startTime}
-                      eventEndTime={processed.event.endTime}
-                      dwellTimes={processed.dwellTimes}
-                      profiles={processed.profiles}
-                    />
-                  </div>
-                )}
+                {activeTab === "users" && (() => {
+                  const selectedUser = selectedUserId ? processed.userDetails.find(u => u.userId === selectedUserId) : null;
+                  return (
+                    <div className="flex-1 min-h-0 flex flex-col gap-3">
+                      {selectedUser ? (
+                        <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} />
+                      ) : (
+                        <div className="skeuo-panel flex items-center justify-center" style={{ minHeight: 80 }}>
+                          <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-h-0">
+                        <BeaconHeatmap
+                          {...beaconMapProps}
+                          selectedUserJourney={selectedUserJourney}
+                          eventStartTime={processed.event.startTime}
+                          eventEndTime={processed.event.endTime}
+                          onPlaybackTime={setPlaybackTime}
+                          playbackTime={playbackTime}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
                 {activeTab === "beacons" && (
                   <div className="flex-1 min-h-0">
                     <BeaconsTab
@@ -481,34 +490,40 @@ export default function EventPage() {
               </div>
 
               <div className="w-[40%] flex-shrink-0 h-full flex flex-col gap-3">
-                {activeTab === "users" && (() => {
-                  const selectedUser = selectedUserId ? processed.userDetails.find(u => u.userId === selectedUserId) : null;
-                  return selectedUser ? (
-                    <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} />
-                  ) : (
-                    <div className="skeuo-panel flex items-center justify-center" style={{ minHeight: 80 }}>
-                      <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
-                    </div>
-                  );
-                })()}
-                <div className="flex-1 min-h-0">
-                  <BeaconHeatmap
-                    {...beaconMapProps}
-                    {...(activeTab === "beacons" && playbackMapOverrides ? {
-                      beaconProofCounts: playbackMapOverrides.beaconProofCounts,
-                      transitions: playbackMapOverrides.transitions,
-                      proofs: playbackMapOverrides.proofs,
-                    } : {})}
-                    selectedUserJourney={activeTab === "users" ? selectedUserJourney : undefined}
-                    selectedBeaconId={activeTab === "beacons" ? selectedBeaconId : undefined}
-                    onSelectBeacon={activeTab === "beacons" ? setSelectedBeaconId : undefined}
-                    filteredBeaconIds={activeTab === "beacons" ? filteredBeaconIds : undefined}
-                    eventStartTime={processed.event.startTime}
-                    eventEndTime={processed.event.endTime}
-                    onPlaybackTime={setPlaybackTime}
-                    playbackTime={playbackTime}
-                  />
-                </div>
+                {activeTab === "users" && (
+                  <div className="flex-1 min-h-0">
+                    <UsersTab
+                      users={processed.userDetails}
+                      beacons={processed.beacons}
+                      beaconNames={beaconNames}
+                      selectedUserId={selectedUserId}
+                      onSelectUser={setSelectedUserId}
+                      eventStartTime={processed.event.startTime}
+                      eventEndTime={processed.event.endTime}
+                      dwellTimes={processed.dwellTimes}
+                      profiles={processed.profiles}
+                    />
+                  </div>
+                )}
+                {activeTab !== "users" && (
+                  <div className="flex-1 min-h-0">
+                    <BeaconHeatmap
+                      {...beaconMapProps}
+                      {...(activeTab === "beacons" && playbackMapOverrides ? {
+                        beaconProofCounts: playbackMapOverrides.beaconProofCounts,
+                        transitions: playbackMapOverrides.transitions,
+                        proofs: playbackMapOverrides.proofs,
+                      } : {})}
+                      selectedBeaconId={activeTab === "beacons" ? selectedBeaconId : undefined}
+                      onSelectBeacon={activeTab === "beacons" ? setSelectedBeaconId : undefined}
+                      filteredBeaconIds={activeTab === "beacons" ? filteredBeaconIds : undefined}
+                      eventStartTime={processed.event.startTime}
+                      eventEndTime={processed.event.endTime}
+                      onPlaybackTime={setPlaybackTime}
+                      playbackTime={playbackTime}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

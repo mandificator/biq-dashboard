@@ -286,20 +286,25 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
         </div>
 
         {/* Bottom: Overlap matrix */}
-        <div className="flex gap-3 flex-shrink-0" style={{ height: 420 }}>
+        <div className="flex gap-3 flex-shrink-0">
           <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0">
             <div className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)" }}>
               User Overlap
             </div>
-            <div className="flex-1 overflow-auto">
-              <table className="text-[8px] w-full">
+            <div className="overflow-auto">
+              {(() => {
+                const n = analysis.eventMetrics.length;
+                const maxChars = n <= 2 ? 30 : n <= 3 ? 20 : n <= 5 ? 12 : 8;
+                const truncName = (name: string) => name.length > maxChars ? name.substring(0, maxChars - 1) + "…" : name;
+                return (
+              <table className="text-[8px] w-full" style={{ tableLayout: "fixed" }}>
                 <thead>
                   <tr>
                     <th />
                     {analysis.eventMetrics.map((em, i) => (
                       <th key={em.eventId} className="px-1 py-0.5 text-center font-bold" title={em.eventName}
                         style={{ color: COLORS[i % COLORS.length] }}>
-                        {em.eventName.length > 6 ? em.eventName.substring(0, 5) + ".." : em.eventName}
+                        {truncName(em.eventName)}
                       </th>
                     ))}
                   </tr>
@@ -307,9 +312,9 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
                 <tbody>
                   {analysis.eventMetrics.map((row, ri) => (
                     <tr key={row.eventId}>
-                      <td className="px-1 py-0.5 font-bold text-right" title={row.eventName}
+                      <td className="px-1 py-0.5 font-bold text-right whitespace-nowrap" title={row.eventName}
                         style={{ color: COLORS[ri % COLORS.length] }}>
-                        {row.eventName.length > 6 ? row.eventName.substring(0, 5) + ".." : row.eventName}
+                        {truncName(row.eventName)}
                       </td>
                       {analysis.eventMetrics.map((col, ci) => {
                         if (ri === ci) return (
@@ -339,6 +344,8 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
                   ))}
                 </tbody>
               </table>
+                );
+              })()}
             </div>
           </div>
 
