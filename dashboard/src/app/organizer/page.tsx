@@ -8,13 +8,36 @@ import {
   AnalyticsResponse,
 } from "@/types";
 
+const ACCESS_PASSWORD = "biqP455";
+
 export default function OrganizerIndex() {
   const router = useRouter();
   const [orgList, setOrgList] = useState<OrganizerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState(false);
+
+  // Check sessionStorage for existing auth
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("biq-org-admin-auth") === "1") {
+      setAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    if (password === ACCESS_PASSWORD) {
+      setAuthenticated(true);
+      setAuthError(false);
+      sessionStorage.setItem("biq-org-admin-auth", "1");
+    } else {
+      setAuthError(true);
+    }
+  };
 
   useEffect(() => {
+    if (!authenticated) { setLoading(false); return; }
     (async () => {
       try {
         const res = await fetch("/api/events");
@@ -72,7 +95,34 @@ export default function OrganizerIndex() {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, authenticated]);
+
+  if (!authenticated) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center" style={{ background: "var(--bg-texture)" }}>
+        <div className="skeuo-panel p-6 flex flex-col items-center gap-4" style={{ width: 300 }}>
+          <img src="/logo_biq.png" alt="biq" className="w-10 h-10 object-cover rounded"
+            style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
+          <span className="text-[11px] font-bold" style={{ color: "var(--text-secondary)" }}>Admin Access</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setAuthError(false); }}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            placeholder="Password"
+            className="skeuo-input w-full px-3 py-2 text-[12px] text-center"
+            autoFocus
+          />
+          {authError && (
+            <span className="text-[10px]" style={{ color: "var(--red)" }}>Wrong password</span>
+          )}
+          <button onClick={handleLogin} className="skeuo-btn px-4 py-1.5 text-[11px] font-bold w-full">
+            Enter
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "var(--bg-texture)" }}>
