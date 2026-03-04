@@ -20,9 +20,8 @@ export function analyzeCrossEvents(
     }
   }
 
-  // Shared users: appear in 2+ events
+  // All users across events
   const sharedUsers = Object.entries(userEvents)
-    .filter(([, events]) => events.size >= 2)
     .map(([userId, events]) => ({
       userId,
       eventIds: Array.from(events),

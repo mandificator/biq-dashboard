@@ -58,6 +58,7 @@ const Avatar = React.memo(function Avatar({ src, name, size = 22 }: { src?: stri
 export default function LiveDashboard({ analysis, loadedData, eventNames, eventDates }: LiveDashboardProps) {
   const [legendSort, setLegendSort] = useState<LegendSort>("event");
   const [legendSortAsc, setLegendSortAsc] = useState(true);
+  const [userEventFilter, setUserEventFilter] = useState<number | null>(null);
 
   const handleLegendSort = (col: LegendSort) => {
     if (legendSort === col) setLegendSortAsc((v) => !v);
@@ -91,6 +92,15 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
     return profiles;
   }, [loadedData]);
 
+  const maxEventCount = useMemo(() => {
+    return Math.max(...analysis.sharedUsers.map((u) => u.eventIds.length), 1);
+  }, [analysis.sharedUsers]);
+
+  const filteredUsers = useMemo(() => {
+    if (userEventFilter === null) return analysis.sharedUsers;
+    return analysis.sharedUsers.filter((u) => u.eventIds.length === userEventFilter);
+  }, [analysis.sharedUsers, userEventFilter]);
+
   // ── Radar chart data — normalized to 0-100 ──
   const radarData = useMemo(() => {
     const metrics = ["totalAttendees", "avgDwellMinutes", "totalProofs", "uniqueBeacons", "peakConcurrent"] as const;
@@ -108,20 +118,20 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
     });
   }, [analysis.eventMetrics]);
 
-  // ── Retention donut — returning vs unique-only ──
+  // ── Retention donut — filtered users vs rest ──
   const retentionData = useMemo(() => {
     const totalUnique = new Set<string>();
     for (const em of analysis.eventMetrics) {
       const data = loadedData.get(em.eventId);
       if (data) data.userDetails.forEach((u) => totalUnique.add(u.userId));
     }
-    const returning = analysis.sharedUsers.length;
-    const uniqueOnly = totalUnique.size - returning;
+    const filtered = filteredUsers.length;
+    const rest = totalUnique.size - filtered;
     return [
-      { name: "Returning", value: returning, color: "#0095FF" },
-      { name: "Single Event", value: uniqueOnly, color: "#3a3a42" },
+      { name: userEventFilter === null ? "All" : `${userEventFilter}ev`, value: filtered, color: "#0095FF" },
+      { name: "Other", value: rest, color: "#3a3a42" },
     ];
-  }, [analysis, loadedData]);
+  }, [analysis, loadedData, filteredUsers, userEventFilter]);
   const retentionPct = retentionData[0].value + retentionData[1].value > 0
     ? Math.round((retentionData[0].value / (retentionData[0].value + retentionData[1].value)) * 100)
     : 0;
@@ -209,22 +219,39 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
         <div className="skeuo-panel p-3 flex gap-3 flex-1 min-h-0">
           {/* Users list */}
           <div className="flex flex-col flex-1 min-w-0 min-h-0">
-            <div className="text-[9px] font-bold uppercase tracking-wider mb-2 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
-              Returning Users ({analysis.sharedUsers.length})
+            <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
+              <span className="text-[9px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
+                Users ({filteredUsers.length})
+              </span>
+              <button
+                onClick={() => setUserEventFilter(null)}
+                className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+                style={{ color: userEventFilter === null ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                All
+              </button>
+              {Array.from({ length: maxEventCount }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setUserEventFilter(userEventFilter === n ? null : n)}
+                  className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+                  style={{ color: userEventFilter === n ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                  {n}ev
+                </button>
+              ))}
             </div>
             <div className="flex-1 min-h-0 overflow-auto">
-              {analysis.sharedUsers.length === 0 && (
+              {filteredUsers.length === 0 && (
                 <div className="flex items-center justify-center h-full">
-                  <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>No shared users yet</span>
+                  <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>No users</span>
                 </div>
               )}
-              {analysis.sharedUsers.slice(0, 50).map((user, idx) => {
+              {filteredUsers.slice(0, 50).map((user, idx) => {
                 const profile = allProfiles[user.userId];
                 const rawName = profile?.displayName || user.userId.substring(0, 14) + "...";
                 const name = rawName.length > 15 ? rawName.substring(0, 15) + "…" : rawName;
                 return (
                   <div key={user.userId} className="flex items-center py-1 px-1"
-                    style={{ borderBottom: idx < Math.min(analysis.sharedUsers.length, 50) - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined }}>
+                    style={{ borderBottom: idx < Math.min(filteredUsers.length, 50) - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined }}>
                     <Avatar src={profile?.profilePicture} name={name} size={20} />
                     <span className="text-[9px] font-bold truncate flex-shrink-0 ml-1.5" style={{ color: "var(--text-primary)", width: 95 }}>
                       {name}
@@ -279,8 +306,8 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
               </div>
             </div>
             <div className="flex flex-col items-center gap-1 mt-2 text-[9px]">
-              <span className="font-bold" style={{ color: "#0095FF" }}>{retentionData[0].value} returning</span>
-              <span className="font-bold" style={{ color: "var(--text-tertiary)" }}>{retentionData[1].value} single-event</span>
+              <span className="font-bold" style={{ color: "#0095FF" }}>{retentionData[0].value} {retentionData[0].name}</span>
+              <span className="font-bold" style={{ color: "var(--text-tertiary)" }}>{retentionData[1].value} other</span>
             </div>
           </div>
         </div>
