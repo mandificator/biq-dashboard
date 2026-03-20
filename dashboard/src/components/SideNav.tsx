@@ -49,7 +49,7 @@ export default function SideNav() {
       className="flex-shrink-0 flex flex-col items-center py-3 gap-1"
       style={{
         width: 48,
-        background: "linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%)",
+        background: "var(--nav-bg)",
         borderRight: "1px solid rgba(0,0,0,0.5)",
         boxShadow: "1px 0 4px rgba(0,0,0,0.3), inset -1px 0 0 rgba(255,255,255,0.03)",
       }}
@@ -91,7 +91,7 @@ export default function SideNav() {
             style={{
               color: active ? "var(--text-primary)" : "var(--text-tertiary)",
               background: active
-                ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)"
+                ? "var(--selected-bg)"
                 : "transparent",
               boxShadow: active
                 ? "1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)"

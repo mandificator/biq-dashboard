@@ -14,7 +14,7 @@ const Avatar = React.memo(function Avatar({ src, name, size = 32 }: { src?: stri
     return (
       <div
         className="rounded-full flex items-center justify-center flex-shrink-0 font-bold skeuo-inset"
-        style={{ width: px, height: px, fontSize: size * 0.38, color: "#9a9aa6", borderRadius: "50%" }}
+        style={{ width: px, height: px, fontSize: size * 0.38, color: "var(--chart-label)", borderRadius: "50%" }}
       >
         {initial}
       </div>
@@ -66,7 +66,7 @@ function UserRow({ user, isSelected, onSelect }: {
       className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left transition-all duration-100"
       style={{
         background: isSelected
-          ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)"
+          ? "var(--selected-bg)"
           : "transparent",
         borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
         boxShadow: isSelected ? "1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)" : "none",
@@ -131,13 +131,14 @@ function UserColumn({ title, count, color, icon, users, selectedUserId, onSelect
 }
 
 // ── Exported: User Detail Panel (used in page.tsx above beacon map) ──
-export function UserDetailPanel({ user, beacons, beaconNames }: {
+export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick }: {
   user: UserDetail;
   beacons: Record<string, Beacon>;
   beaconNames: Record<string, string>;
+  onTimeClick?: (time: number) => void;
 }) {
   return (
-    <div className="skeuo-panel flex-1 min-w-0 flex flex-col overflow-hidden">
+    <div className="skeuo-panel min-w-0 flex flex-col overflow-hidden h-full">
       {/* Header */}
       <div
         className="flex items-center gap-3 p-3 pb-2.5"
@@ -203,7 +204,9 @@ export function UserDetailPanel({ user, beacons, beaconNames }: {
                     background: isTransition
                       ? "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)"
                       : "transparent",
+                    cursor: onTimeClick ? "pointer" : undefined,
                   }}
+                  onClick={() => onTimeClick?.(entry.time)}
                 >
                   <div
                     className="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -231,7 +234,9 @@ export function UserDetailPanel({ user, beacons, beaconNames }: {
   );
 }
 
-// ── Main UsersTab: left side only (3 columns + dwell time) ──
+type Filter = "all" | "present" | "left";
+
+// ── Main UsersTab: single list with filter tabs ──
 interface Props {
   users: UserDetail[];
   beacons: Record<string, Beacon>;
@@ -244,51 +249,63 @@ interface Props {
   profiles: Record<string, Profile>;
 }
 
-export default function UsersTab({ users, selectedUserId, onSelectUser, dwellTimes, profiles }: Props) {
-  const { arrived, present, left } = useMemo(() => {
-    const arrived = [...users].sort((a, b) => a.firstProof - b.firstProof);
-    const present = users.filter(u => u.status === "present").sort((a, b) => b.lastProof - a.lastProof);
-    const left = users.filter(u => u.status === "left").sort((a, b) => b.lastProof - a.lastProof);
-    return { arrived, present, left };
+export default React.memo(function UsersTab({ users, selectedUserId, onSelectUser }: Props) {
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const { all, presentCount, leftCount } = useMemo(() => {
+    const all = [...users].sort((a, b) => a.firstProof - b.firstProof);
+    const presentCount = users.filter(u => u.status === "present").length;
+    const leftCount = users.filter(u => u.status === "left").length;
+    return { all, presentCount, leftCount };
   }, [users]);
 
-  return (
-    <div className="flex flex-col gap-3 h-full">
-      {/* 3 status columns */}
-      <div className="flex gap-3 flex-1 min-h-0">
-        <UserColumn
-          title="Arrived"
-          count={arrived.length}
-          color="#0095FF"
-          icon="📥"
-          users={arrived}
-          selectedUserId={selectedUserId}
-          onSelectUser={onSelectUser}
-        />
-        <UserColumn
-          title="Present"
-          count={present.length}
-          color="#8CC63F"
-          icon="📍"
-          users={present}
-          selectedUserId={selectedUserId}
-          onSelectUser={onSelectUser}
-        />
-        <UserColumn
-          title="Left"
-          count={left.length}
-          color="#F7941D"
-          icon="🚪"
-          users={left}
-          selectedUserId={selectedUserId}
-          onSelectUser={onSelectUser}
-        />
-      </div>
+  const filtered = useMemo(() => {
+    if (filter === "all") return all;
+    return all.filter(u => u.status === filter);
+  }, [all, filter]);
 
-      {/* Dwell time */}
-      <div className="flex-1 min-h-0">
-        <DwellTimeChart data={dwellTimes} profiles={profiles} onClickUser={(uid) => onSelectUser(uid)} />
+  const tabs: { key: Filter; label: string; count: number; color: string }[] = [
+    { key: "all", label: "All", count: all.length, color: "#0095FF" },
+    { key: "present", label: "Present", count: presentCount, color: "#8CC63F" },
+    { key: "left", label: "Left", count: leftCount, color: "#F7941D" },
+  ];
+
+  return (
+    <div className="skeuo-panel flex-1 min-w-0 flex flex-col overflow-hidden h-full">
+      {/* Filter tabs */}
+      <div className="px-2 py-1.5 flex items-center gap-1" style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}>
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setFilter(t.key)}
+            className="px-2 py-0.5 rounded-md text-[9px] font-bold transition-all"
+            style={{
+              background: filter === t.key ? "var(--selected-bg)" : "transparent",
+              color: filter === t.key ? t.color : "var(--text-tertiary)",
+              boxShadow: filter === t.key ? "var(--selected-shadow)" : "none",
+            }}
+          >
+            {t.label} <span style={{ opacity: 0.7 }}>{t.count}</span>
+          </button>
+        ))}
+      </div>
+      {/* User list */}
+      <div className="flex-1 overflow-y-auto m-1.5 skeuo-inset">
+        <div className="p-1 space-y-0.5">
+          {filtered.length === 0 ? (
+            <div className="text-[9px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>No users</div>
+          ) : (
+            filtered.map((u) => (
+              <UserRow
+                key={u.userId}
+                user={u}
+                isSelected={selectedUserId === u.userId}
+                onSelect={() => onSelectUser(selectedUserId === u.userId ? null : u.userId)}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
-}
+});

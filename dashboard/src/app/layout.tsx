@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Mono } from "next/font/google";
 import "./globals.css";
 import SideNav from "@/components/SideNav";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const spaceMono = Space_Mono({
   variable: "--font-space-mono",
@@ -25,6 +26,7 @@ export default function RootLayout({
         <div className="h-screen flex overflow-hidden">
           <SideNav />
           <div className="flex-1 min-w-0">{children}</div>
+          <ThemeToggle />
         </div>
       </body>
     </html>

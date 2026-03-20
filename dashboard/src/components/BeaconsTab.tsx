@@ -23,7 +23,7 @@ const Avatar = React.memo(function Avatar({ src, name, size = 32 }: { src?: stri
     return (
       <div
         className="rounded-full flex items-center justify-center flex-shrink-0 font-bold skeuo-inset"
-        style={{ width: px, height: px, fontSize: size * 0.38, color: "#9a9aa6", borderRadius: "50%" }}
+        style={{ width: px, height: px, fontSize: size * 0.38, color: "var(--chart-label)", borderRadius: "50%" }}
       >
         {initial}
       </div>
@@ -193,8 +193,8 @@ function ClusterDropdown({ value, onChange, allLabel, options }: {
         <div
           className="absolute left-2 right-2 z-20 mt-1 py-1 rounded-lg overflow-hidden"
           style={{
-            background: "linear-gradient(180deg, #2e2e34 0%, #262628 100%)",
-            border: "1px solid #4a4a52",
+            background: "var(--popover-bg)",
+            border: "1px solid var(--btn-border)",
             boxShadow: "0 8px 24px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)",
           }}
         >
@@ -234,17 +234,17 @@ function ClusterDropdown({ value, onChange, allLabel, options }: {
 
 // Mini sparkline tooltip
 const miniTooltipStyle = {
-  background: "linear-gradient(180deg, #2a2a30 0%, #222226 100%)",
-  border: "1px solid rgba(255,255,255,0.1)",
+  background: "var(--tooltip-bg)",
+  border: "1px solid var(--tooltip-border)",
   borderRadius: 6,
-  color: "#e8e8ec",
+  color: "var(--chart-text)",
   fontSize: 9,
   fontFamily: "var(--font-space-mono), monospace",
   padding: "4px 8px",
   boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
 };
 
-export default function BeaconsTab({
+export default React.memo(function BeaconsTab({
   beacons,
   beaconNames,
   beaconProofCounts,
@@ -513,12 +513,12 @@ export default function BeaconsTab({
               return (
                 <button
                   key={b.id}
-                  data-nav-zone="1"
+                 
                   onClick={() => onSelectBeacon(isSelected ? null : b.id)}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-all duration-100"
                   style={{
                     background: isSelected
-                      ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)"
+                      ? "var(--selected-bg)"
                       : "transparent",
                     borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
                     boxShadow: isSelected ? "1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)" : "none",
@@ -527,7 +527,7 @@ export default function BeaconsTab({
                   <div
                     className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[9px] font-bold"
                     style={{
-                      background: "linear-gradient(180deg, #2a2a32 0%, #222228 100%)",
+                      background: "var(--inset-bg)",
                       border: "1px solid rgba(255,255,255,0.06)",
                       color: "var(--text-secondary)",
                     }}
@@ -581,7 +581,7 @@ export default function BeaconsTab({
               <div
                 className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-[13px] font-bold"
                 style={{
-                  background: "linear-gradient(180deg, #2a2a32 0%, #222228 100%)",
+                  background: "var(--inset-bg)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   color: "var(--text-primary)",
                   boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
@@ -658,12 +658,12 @@ export default function BeaconsTab({
                             <stop offset="100%" stopColor="#0095FF" stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <XAxis dataKey="label" tick={{ fill: "#66666e", fontSize: 8 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                        <YAxis tick={{ fill: "#66666e", fontSize: 8 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <XAxis dataKey="label" tick={{ fill: "var(--chart-tick)", fontSize: 8 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tick={{ fill: "var(--chart-tick)", fontSize: 8 }} axisLine={false} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={miniTooltipStyle}
-                          labelStyle={{ color: "#9a9aa6", fontSize: 8 }}
-                          itemStyle={{ color: "#e8e8ec", fontSize: 9 }}
+                          labelStyle={{ color: "var(--chart-label)", fontSize: 8 }}
+                          itemStyle={{ color: "var(--chart-text)", fontSize: 9 }}
                           cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}
                         />
                         <Area
@@ -803,4 +803,4 @@ export default function BeaconsTab({
       </div>
     </div>
   );
-}
+});

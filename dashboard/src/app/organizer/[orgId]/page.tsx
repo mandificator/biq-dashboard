@@ -187,15 +187,15 @@ export default function OrganizerDashboard() {
       <header
         className="flex-shrink-0 flex items-center justify-between px-5 h-[52px]"
         style={{
-          background: "linear-gradient(180deg, #2e2e34 0%, #242428 60%, #202024 100%)",
-          borderBottom: "1px solid rgba(0,0,0,0.5)",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
+          background: "var(--header-bg)",
+          borderBottom: "1px solid var(--header-border)",
+          boxShadow: "var(--header-shadow)",
         }}
       >
         <div className="flex items-center gap-3">
           {orgInfo && (
             <div className="flex items-center gap-2 ml-1">
-              <div className="w-px h-4" style={{ background: "rgba(255,255,255,0.08)" }} />
+              <div className="w-px h-4" style={{ background: "var(--overlay-divider)" }} />
               {orgInfo.logo && (
                 <img src={orgInfo.logo} alt="" className="w-6 h-6 rounded-md object-cover"
                   style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
@@ -217,7 +217,7 @@ export default function OrganizerDashboard() {
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mr-8">
           {loading && (
             <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid var(--accent)", borderTopColor: "transparent" }} />
           )}
@@ -246,7 +246,7 @@ export default function OrganizerDashboard() {
           {/* ── Left sidebar: event list ── */}
           <div className="w-[260px] flex-shrink-0 flex flex-col skeuo-panel overflow-hidden">
             {/* Select all / clear */}
-            <div className="flex items-center gap-1.5 px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="flex items-center gap-1.5 px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--overlay-border)" }}>
               <span className="text-[9px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
                 Events ({orgEvents.length})
               </span>

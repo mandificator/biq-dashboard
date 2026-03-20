@@ -34,13 +34,9 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
       className="flex flex-col rounded-lg cursor-pointer transition-all duration-100 overflow-hidden"
       onClick={() => onToggle(event.id)}
       style={{
-        background: selected
-          ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)"
-          : "transparent",
+        background: selected ? "var(--selected-bg)" : "transparent",
         borderLeft: `3px solid ${selected ? color : "transparent"}`,
-        boxShadow: selected
-          ? "1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)"
-          : "none",
+        boxShadow: selected ? "var(--selected-shadow)" : "none",
       }}
     >
       {/* Top: image + info */}
@@ -100,7 +96,7 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
         style={{
           background: "transparent",
           color: "var(--text-tertiary)",
-          borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderTop: "1px solid var(--overlay-border)",
         }}
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

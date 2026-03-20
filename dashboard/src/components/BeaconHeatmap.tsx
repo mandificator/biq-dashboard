@@ -9,6 +9,13 @@ interface JourneyStep {
   beaconId: string;
   count: number;
   stepIndex: number;
+  time: number;
+}
+
+interface JourneyTransition {
+  from: string;
+  to: string;
+  index: number; // chronological order
 }
 
 interface JourneyEdge {
@@ -184,6 +191,7 @@ interface Props {
   names: Record<string, string>;
   onNameChange: (beaconId: string, name: string) => void;
   selectedUserJourney?: { beaconId: string; time: number }[];
+  selectedUserId?: string | null;
   proofs?: Proof[];
   selectedBeaconId?: string | null;
   onSelectBeacon?: (id: string | null) => void;
@@ -205,6 +213,7 @@ export default function BeaconHeatmap({
   names,
   onNameChange,
   selectedUserJourney,
+  selectedUserId,
   proofs,
   selectedBeaconId,
   onSelectBeacon,
@@ -281,15 +290,21 @@ export default function BeaconHeatmap({
   const hasTimeline = eventStartTime != null && eventEndTime != null && onPlaybackTime && eventEndTime > eventStartTime;
   const isPlaybackActive = playbackTime != null;
 
-  // Sync local time from parent when scrubbing
+  // Sync local time from parent when scrubbing (not during playback)
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
   useEffect(() => {
-    if (playbackTime != null) setLocalPlaybackTime(playbackTime);
+    if (playbackTime != null && !isPlayingRef.current) setLocalPlaybackTime(playbackTime);
   }, [playbackTime]);
 
   // Reset local time when event times change
   useEffect(() => {
     if (eventStartTime != null) setLocalPlaybackTime(eventStartTime);
   }, [eventStartTime]);
+
+  // Ref to call parent without re-triggering effects
+  const onPlaybackTimeRef = useRef(onPlaybackTime);
+  onPlaybackTimeRef.current = onPlaybackTime;
 
   // Animation loop
   useEffect(() => {
@@ -303,10 +318,10 @@ export default function BeaconHeatmap({
         const next = prev + delta * playSpeed;
         if (next >= eventEndTime!) {
           setIsPlaying(false);
-          onPlaybackTime!(eventEndTime!);
+          queueMicrotask(() => onPlaybackTimeRef.current?.(eventEndTime!));
           return eventEndTime!;
         }
-        onPlaybackTime!(next);
+        queueMicrotask(() => onPlaybackTimeRef.current?.(next));
         return next;
       });
       playRafRef.current = requestAnimationFrame(tick);
@@ -367,7 +382,7 @@ export default function BeaconHeatmap({
       if (timeline.length === 0) continue;
       timeline.sort((a, b) => a.time - b.time);
       const profile = profiles[uid];
-      if (!profile?.profilePicture) continue;
+      if (!profile) continue;
 
       const last = timeline[timeline.length - 1];
       const lastPos = activePositionsMap[last.beaconId];
@@ -403,7 +418,7 @@ export default function BeaconHeatmap({
         beaconOccupants[last.beaconId].push(uid);
       }
 
-      pfpRaw.push({ userId: uid, beaconId: last.beaconId, pic: profile.profilePicture, name: profile.displayName || uid, moving, x, y });
+      pfpRaw.push({ userId: uid, beaconId: last.beaconId, pic: profile.profilePicture || "", name: profile.displayName || uid, moving, x, y });
     }
 
     // Second pass: position occupants in rings around their beacon
@@ -436,8 +451,12 @@ export default function BeaconHeatmap({
       }
     }
 
+    // If a user is selected, show only their PFP
+    if (selectedUserId) {
+      return pfpRaw.filter(p => p.userId === selectedUserId);
+    }
     return pfpRaw;
-  }, [isPlaybackActive, viewMode, proofs, profiles, playbackTime, positions, fsPositions, isFullscreen, beaconProofCounts]);
+  }, [isPlaybackActive, viewMode, proofs, profiles, playbackTime, positions, fsPositions, isFullscreen, beaconProofCounts, selectedUserId]);
 
   // Fullscreen display settings — persisted to localStorage
   const [fsSettings, setFsSettings] = useState<FsSettings>(FS_DEFAULTS);
@@ -826,23 +845,37 @@ export default function BeaconHeatmap({
     return groups;
   }, [isFullscreen, orbitingPfps, fsSettings.pfpRadius, fsSettings.orbitCenter, fsSettings.orgSize, fsSettings.beaconRadius, visibleBeaconIds, fsActiveBeaconIds, positions, fsPositions]);
 
-  // Build journey steps
+  // Build journey steps — filtered by playbackTime when playing
   const journeySteps = useMemo<JourneyStep[]>(() => {
     if (!selectedUserJourney || selectedUserJourney.length === 0) return [];
     const steps: JourneyStep[] = [];
     let stepIdx = 0;
     for (const entry of selectedUserJourney) {
+      if (playbackTime != null && entry.time > playbackTime) break;
       const last = steps[steps.length - 1];
       if (last && last.beaconId === entry.beaconId) {
         last.count++;
       } else {
-        steps.push({ beaconId: entry.beaconId, count: 1, stepIndex: stepIdx++ });
+        steps.push({ beaconId: entry.beaconId, count: 1, stepIndex: stepIdx++, time: entry.time });
       }
     }
     return steps;
-  }, [selectedUserJourney]);
+  }, [selectedUserJourney, playbackTime]);
 
-  // Simplified journey: one edge per beacon pair with trip count
+  // Individual transitions for progressive drawing with fade
+  const journeyTransitions = useMemo<JourneyTransition[]>(() => {
+    if (journeySteps.length < 2) return [];
+    const transitions: JourneyTransition[] = [];
+    for (let i = 1; i < journeySteps.length; i++) {
+      const a = journeySteps[i - 1].beaconId;
+      const b = journeySteps[i].beaconId;
+      if (a === b) continue;
+      transitions.push({ from: a, to: b, index: transitions.length });
+    }
+    return transitions;
+  }, [journeySteps]);
+
+  // Directional journey: separate A→B and B→A edges with trip counts
   const journeySummary = useMemo<JourneySummary | null>(() => {
     if (journeySteps.length < 2) return null;
     const edgeMap: Record<string, number> = {};
@@ -852,7 +885,7 @@ export default function BeaconHeatmap({
       const a = journeySteps[i - 1].beaconId;
       const b = journeySteps[i].beaconId;
       if (a === b) continue;
-      const key = [a, b].sort().join("||");
+      const key = `${a}||${b}`;
       edgeMap[key] = (edgeMap[key] || 0) + 1;
     }
     const edges: JourneyEdge[] = Object.entries(edgeMap).map(([key, trips]) => {
@@ -919,15 +952,19 @@ export default function BeaconHeatmap({
     setDragOffset({ x: svgPt.x - pos.x, y: svgPt.y - pos.y });
   }, [toSvgCoords, positions, isFullscreen, fsPositions]);
 
+  const dragRafRef = useRef(0);
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragging) return;
     didDragRef.current = true;
-    const svgPt = toSvgCoords(e);
-    const minX = vbX + 20;
-    const maxX = vbX + vbW - 20;
-    const newX = Math.max(minX, Math.min(maxX, svgPt.x - dragOffset.x));
-    const newY = Math.max(20, Math.min(380, svgPt.y - dragOffset.y));
-    setLocalDragPos({ id: dragging, x: newX, y: newY });
+    cancelAnimationFrame(dragRafRef.current);
+    dragRafRef.current = requestAnimationFrame(() => {
+      const svgPt = toSvgCoords(e);
+      const minX = vbX + 20;
+      const maxX = vbX + vbW - 20;
+      const newX = Math.max(minX, Math.min(maxX, svgPt.x - dragOffset.x));
+      const newY = Math.max(20, Math.min(380, svgPt.y - dragOffset.y));
+      setLocalDragPos({ id: dragging, x: newX, y: newY });
+    });
   }, [dragging, dragOffset, toSvgCoords, vbX, vbW]);
 
   const handleMouseUp = useCallback(() => {
@@ -1049,8 +1086,8 @@ export default function BeaconHeatmap({
             </radialGradient>
           );
         })}
-        <marker id="journey-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-          <polygon points="0 0, 8 3, 0 6" fill="#00D4F5" opacity="0.85" />
+        <marker id="journey-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+          <polygon points="0 0.8, 6 3, 0 5.2" fill="#00D4F5" opacity="0.8" />
         </marker>
         {/* Stable clipPaths for PFPs — one per user, reused every frame */}
         {Object.values(orbitingPfps).flat().map((u) => (
@@ -1115,32 +1152,47 @@ export default function BeaconHeatmap({
       })}
 
       {/* Journey overlay — one line per beacon pair with trip count */}
-      {journeySummary && !(isFullscreen && fsSettings.orbitCenter) && journeySummary.edges.map((edge, i) => {
-        const fromPos = getPos(edge.from); const toPos = getPos(edge.to);
-        if (!fromPos || !toPos) return null;
-        const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        if (len === 0) return null;
-        const thickness = 1.5 + Math.min(edge.trips, 8) * 0.5;
-        const mx = (fromPos.x + toPos.x) / 2;
-        const my = (fromPos.y + toPos.y) / 2;
-        return (
-          <g key={`journey-edge-${i}`}>
-            <line x1={fromPos.x} y1={fromPos.y} x2={toPos.x} y2={toPos.y}
-              stroke="#00D4F5" strokeWidth={thickness} strokeDasharray="6 4" opacity={0.7}
-              strokeLinecap="round" className="animate-dash" />
-            {edge.trips > 1 && (
-              <>
-                <circle cx={mx} cy={my} r={8} fill="rgba(0,0,0,0.6)" stroke="#00D4F5" strokeWidth={1} />
-                <text x={mx} y={my + 0.5} textAnchor="middle" dominantBaseline="central"
-                  fill="#00D4F5" fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>
-                  {edge.trips}x
-                </text>
-              </>
-            )}
-          </g>
-        );
-      })}
+      {journeyTransitions.length > 0 && !(isFullscreen && fsSettings.orbitCenter) && (() => {
+        const total = journeyTransitions.length;
+        return journeyTransitions.map((seg, i) => {
+          const fromPos = getPos(seg.from); const toPos = getPos(seg.to);
+          if (!fromPos || !toPos) return null;
+          const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len === 0) return null;
+
+          // Fade: each line loses 50% opacity when a new one appears
+          const age = total - 1 - i; // 0 = newest
+          const opacity = 0.9 * Math.pow(0.5, age);
+          if (opacity < 0.02) return null;
+
+          // Consistent perpendicular: always compute from the "smaller" beacon
+          // so both A→B and B→A use the same normal direction, just opposite side
+          const isForward = seg.from < seg.to;
+          const pdx = isForward ? dx : -dx;
+          const pdy = isForward ? dy : -dy;
+          const side = isForward ? 5 : -5;
+          const nx = -pdy / len * side;
+          const ny = pdx / len * side;
+
+          const fromCount = beaconProofCounts[seg.from] || 0;
+          const toCount = beaconProofCounts[seg.to] || 0;
+          const fromRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (fromCount / maxCount) * 22;
+          const toRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (toCount / maxCount) * 22;
+          const ux = dx / len, uy = dy / len;
+          const x1 = fromPos.x + ux * (fromRadius + 2) + nx;
+          const y1 = fromPos.y + uy * (fromRadius + 2) + ny;
+          const x2 = toPos.x - ux * (toRadius + 8) + nx;
+          const y2 = toPos.y - uy * (toRadius + 8) + ny;
+
+          return (
+            <line key={`journey-seg-${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke="#00D4F5" strokeWidth={0.8} opacity={opacity}
+              strokeLinecap="round" markerEnd="url(#journey-arrow)"
+              style={{ transition: "opacity 0.6s ease-out" }} />
+          );
+        });
+      })()}
 
       {/* Beacon nodes */}
       {!(isFullscreen && fsSettings.orbitCenter) && beaconList.map((b) => {
@@ -1165,18 +1217,8 @@ export default function BeaconHeatmap({
               strokeOpacity={activeSelectedId === b.id ? 0.9 : isInJourney ? 0.8 : 0.5} />
             <circle cx={pos.x} cy={pos.y} r={nodeRadius * 0.55} fill={color} opacity={0.95} />
             <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
-              fill={isFullscreen ? fsSettings.textColor : "white"} fontSize={Math.max(6, nodeRadius * 0.4)}
+              fill={isFullscreen ? fsSettings.textColor : "white"} fontSize={Math.max(5, nodeRadius * 0.25)}
               fontWeight="700" style={{ pointerEvents: "none" }}>{truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 10)}</text>
-            {(isJourneyStart || isJourneyEnd) && (
-              <>
-                <circle cx={pos.x + nodeRadius * 0.7} cy={pos.y - nodeRadius * 0.7} r={8}
-                  fill={isJourneyStart ? "#00D4F5" : "#F7941D"} />
-                <text x={pos.x + nodeRadius * 0.7} y={pos.y - nodeRadius * 0.7 + 0.5} textAnchor="middle" dominantBaseline="central"
-                  fill="white" fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>
-                  {isJourneyStart ? "S" : "E"}
-                </text>
-              </>
-            )}
           </g>
         );
       })}
@@ -1250,8 +1292,8 @@ export default function BeaconHeatmap({
         bottom: isFullscreen ? undefined : 42,
         right: isFullscreen ? undefined : 8,
         width: 220, zIndex: 30,
-        background: "linear-gradient(180deg, #2a2a30 0%, #242428 100%)",
-        border: "1px solid #4a4a52", borderRadius: 10, padding: 12,
+        background: "var(--tooltip-bg)",
+        border: "1px solid var(--btn-border)", borderRadius: 10, padding: 12,
         display: "flex", flexDirection: "column", gap: 12,
         boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
       }}
@@ -1279,7 +1321,7 @@ export default function BeaconHeatmap({
       {/* Show event title */}
       <div>
         <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
-          <input data-nav-zone="3" type="checkbox" checked={fsSettings.showTitle} onChange={(e) => updateFs("showTitle", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
+          <input type="checkbox" checked={fsSettings.showTitle} onChange={(e) => updateFs("showTitle", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Show Event Title
         </label>
         {fsSettings.showTitle && (
@@ -1301,7 +1343,7 @@ export default function BeaconHeatmap({
       {/* Only active beacons */}
       <div>
         <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
-          <input data-nav-zone="3" type="checkbox" checked={fsSettings.onlyActive1h} onChange={(e) => updateFs("onlyActive1h", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
+          <input type="checkbox" checked={fsSettings.onlyActive1h} onChange={(e) => updateFs("onlyActive1h", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Only Active (1h)
         </label>
       </div>
@@ -1309,7 +1351,7 @@ export default function BeaconHeatmap({
       {/* Orbit around center logo */}
       <div>
         <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
-          <input data-nav-zone="3" type="checkbox" checked={fsSettings.orbitCenter} onChange={(e) => updateFs("orbitCenter", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
+          <input type="checkbox" checked={fsSettings.orbitCenter} onChange={(e) => updateFs("orbitCenter", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Orbit Around Logo
         </label>
       </div>
@@ -1336,7 +1378,7 @@ export default function BeaconHeatmap({
       <div>
         <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Organizer Logo</label>
         <div className="flex items-center gap-2 mb-1.5">
-          <label style={{ background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
+          <label style={{ background: "var(--btn-bg)", border: "1px solid var(--btn-border)", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
             Upload
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoUpload(e, "orgLogo")} />
           </label>
@@ -1363,11 +1405,11 @@ export default function BeaconHeatmap({
       {/* Show sponsor toggle + logo */}
       <div>
         <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer mb-1" style={{ color: "var(--text-tertiary)" }}>
-          <input data-nav-zone="3" type="checkbox" checked={fsSettings.showSponsor} onChange={(e) => updateFs("showSponsor", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
+          <input type="checkbox" checked={fsSettings.showSponsor} onChange={(e) => updateFs("showSponsor", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Show Sponsor
         </label>
         <div className="flex items-center gap-2 mb-1.5">
-          <label style={{ background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
+          <label style={{ background: "var(--btn-bg)", border: "1px solid var(--btn-border)", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
             Upload
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoUpload(e, "sponsorLogo")} />
           </label>
@@ -1454,10 +1496,10 @@ export default function BeaconHeatmap({
             <button onClick={() => setShowSettings(!showSettings)}
               style={{
                 width: 32, height: 32, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
-                background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52",
+                background: "var(--btn-bg)", border: "1px solid var(--btn-border)",
                 opacity: showSettings ? 1 : 0.5, cursor: "pointer",
               }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8e8ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--icon-stroke)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -1480,7 +1522,7 @@ export default function BeaconHeatmap({
                 }}
                 style={{
                   height: 32, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  background: "linear-gradient(180deg, #1aabff 0%, #0095FF 60%, #0080dd 100%)", border: "1px solid #4a4a52",
+                  background: "linear-gradient(180deg, #1aabff 0%, #0095FF 60%, #0080dd 100%)", border: "1px solid var(--btn-border)",
                   color: "white", width: "100%",
                 }}>
                 Full Screen
@@ -1488,7 +1530,7 @@ export default function BeaconHeatmap({
               <button onClick={toggleFullscreen}
                 style={{
                   height: 32, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52",
+                  background: "var(--btn-bg)", border: "1px solid var(--btn-border)",
                   color: "#00D4F5", width: "100%",
                 }}>
                 Close Window
@@ -1677,10 +1719,10 @@ export default function BeaconHeatmap({
             <button onClick={() => setShowSettings2(!showSettings2)}
               style={{
                 width: 32, height: 32, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
-                background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52",
+                background: "var(--btn-bg)", border: "1px solid var(--btn-border)",
                 opacity: showSettings2 ? 1 : 0.5, cursor: "pointer",
               }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e8e8ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--icon-stroke)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -1694,8 +1736,8 @@ export default function BeaconHeatmap({
               display: "flex", flexDirection: "column", gap: 8,
             }}>
               <div style={{
-                width: 250, background: "linear-gradient(180deg, #2a2a30 0%, #242428 100%)",
-                border: "1px solid #4a4a52", borderRadius: 10, padding: 12,
+                width: 250, background: "var(--tooltip-bg)",
+                border: "1px solid var(--btn-border)", borderRadius: 10, padding: 12,
                 display: "flex", flexDirection: "column", gap: 10,
                 boxShadow: "0 4px 20px rgba(0,0,0,0.5)", maxHeight: "80vh", overflowY: "auto",
               }}>
@@ -1704,7 +1746,7 @@ export default function BeaconHeatmap({
                   <label style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4, color: "#888" }}>Background</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <input type="color" value={s2Settings.bgColor} onChange={(e) => updateS2("bgColor", e.target.value)} style={{ width: 24, height: 24, borderRadius: 4, cursor: "pointer", border: "none", padding: 0, background: "none" }} />
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "#999" }}>{s2Settings.bgColor}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-secondary)" }}>{s2Settings.bgColor}</span>
                   </div>
                 </div>
 
@@ -1715,7 +1757,7 @@ export default function BeaconHeatmap({
                     onChange={(e) => updateS2("headerText", e.target.value)}
                     style={{
                       width: "100%", marginBottom: 6, padding: "4px 6px", fontSize: 10, fontWeight: 600,
-                      background: "#1a1a1e", border: "1px solid #3a3a42", borderRadius: 4,
+                      background: "var(--input-bg)", border: "1px solid var(--input-border)", borderRadius: 4,
                       color: "#ccc", outline: "none", fontFamily: "monospace",
                     }}
                   />
@@ -1754,13 +1796,13 @@ export default function BeaconHeatmap({
                 </div>
 
                 {/* ── Text 1 (name greeting) ── */}
-                <div style={{ borderTop: "1px solid #3a3a42", paddingTop: 10 }}>
+                <div style={{ borderTop: "1px solid var(--input-border)", paddingTop: 10 }}>
                   <label style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6, color: "#888" }}>Text 1 (name) — use {"{name}"}</label>
                   <input type="text" value={s2Settings.text1Content}
                     onChange={(e) => updateS2("text1Content", e.target.value)}
                     style={{
                       width: "100%", marginBottom: 6, padding: "4px 6px", fontSize: 10, fontWeight: 600,
-                      background: "#1a1a1e", border: "1px solid #3a3a42", borderRadius: 4,
+                      background: "var(--input-bg)", border: "1px solid var(--input-border)", borderRadius: 4,
                       color: "#ccc", outline: "none", fontFamily: "monospace",
                     }}
                   />
@@ -1777,7 +1819,7 @@ export default function BeaconHeatmap({
                 </div>
 
                 {/* ── Text 2 (random messages) ── */}
-                <div style={{ borderTop: "1px solid #3a3a42", paddingTop: 10 }}>
+                <div style={{ borderTop: "1px solid var(--input-border)", paddingTop: 10 }}>
                   <label style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6, color: "#888" }}>Text 2 (random) — use {"{name}"}</label>
                   {s2Settings.messages.map((msg, i) => (
                     <input key={i} type="text" value={msg}
@@ -1788,7 +1830,7 @@ export default function BeaconHeatmap({
                       }}
                       style={{
                         width: "100%", marginBottom: 4, padding: "4px 6px", fontSize: 10, fontWeight: 600,
-                        background: "#1a1a1e", border: "1px solid #3a3a42", borderRadius: 4,
+                        background: "var(--input-bg)", border: "1px solid var(--input-border)", borderRadius: 4,
                         color: "#ccc", outline: "none", fontFamily: "monospace",
                       }}
                     />
@@ -1806,10 +1848,10 @@ export default function BeaconHeatmap({
                 </div>
 
                 {/* ── Logos ── */}
-                <div style={{ borderTop: "1px solid #3a3a42", paddingTop: 10 }}>
+                <div style={{ borderTop: "1px solid var(--input-border)", paddingTop: 10 }}>
                   <label style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4, color: "#888" }}>Organizer Logo (header)</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <label style={{ background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "#999" }}>
+                    <label style={{ background: "var(--btn-bg)", border: "1px solid var(--btn-border)", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
                       Upload
                       <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleS2LogoUpload(e, "orgLogo")} />
                     </label>
@@ -1836,7 +1878,7 @@ export default function BeaconHeatmap({
                 <div>
                   <label style={{ fontSize: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 4, color: "#888" }}>Sponsor Logo (draggable)</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <label style={{ background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "#999" }}>
+                    <label style={{ background: "var(--btn-bg)", border: "1px solid var(--btn-border)", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
                       Upload
                       <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleS2LogoUpload(e, "sponsorLogo")} />
                     </label>
@@ -1874,7 +1916,7 @@ export default function BeaconHeatmap({
                 }}
                 style={{
                   height: 32, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  background: "linear-gradient(180deg, #1aabff 0%, #0095FF 60%, #0080dd 100%)", border: "1px solid #4a4a52",
+                  background: "linear-gradient(180deg, #1aabff 0%, #0095FF 60%, #0080dd 100%)", border: "1px solid var(--btn-border)",
                   color: "white", width: "100%",
                 }}>
                 Full Screen
@@ -1882,7 +1924,7 @@ export default function BeaconHeatmap({
               <button onClick={toggleScreen2}
                 style={{
                   height: 32, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                  background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52",
+                  background: "var(--btn-bg)", border: "1px solid var(--btn-border)",
                   color: "#00D4F5", width: "100%",
                 }}>
                 Close Window
@@ -1913,16 +1955,16 @@ export default function BeaconHeatmap({
       </div>
       {!hasJourney && (
         <div className="px-3 pb-1.5 flex gap-1">
-          <button data-nav-zone="1" onClick={() => setProofRange(null)} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
-            style={{ background: !proofRange ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)" : "transparent", color: !proofRange ? "var(--text-primary)" : "var(--text-tertiary)", border: !proofRange ? "1px solid var(--border-highlight)" : "1px solid transparent" }}>All</button>
+          <button onClick={() => setProofRange(null)} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
+            style={{ background: !proofRange ? "var(--selected-bg)" : "transparent", color: !proofRange ? "var(--text-primary)" : "var(--text-tertiary)", border: !proofRange ? "1px solid var(--border-highlight)" : "1px solid transparent" }}>All</button>
           {proofRanges.map((r) => (
-            <button data-nav-zone="1" key={r.id} onClick={() => setProofRange(proofRange === r.id ? null : r.id)} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
-              style={{ background: proofRange === r.id ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)" : "transparent", color: proofRange === r.id ? "var(--text-primary)" : "var(--text-tertiary)", border: proofRange === r.id ? "1px solid var(--border-highlight)" : "1px solid transparent" }}>{r.label}</button>
+            <button key={r.id} onClick={() => setProofRange(proofRange === r.id ? null : r.id)} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
+              style={{ background: proofRange === r.id ? "var(--selected-bg)" : "transparent", color: proofRange === r.id ? "var(--text-primary)" : "var(--text-tertiary)", border: proofRange === r.id ? "1px solid var(--border-highlight)" : "1px solid transparent" }}>{r.label}</button>
           ))}
-          <button data-nav-zone="1" onClick={() => setProofRange(proofRange === "last1h" ? null : "last1h")} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
-            style={{ background: proofRange === "last1h" ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)" : "transparent", color: proofRange === "last1h" ? "#00D4F5" : "var(--text-tertiary)", border: proofRange === "last1h" ? "1px solid #00D4F544" : "1px solid transparent" }}>1h</button>
-          <button data-nav-zone="1" onClick={toggleFullscreen} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 1</button>
-          <button data-nav-zone="1" onClick={toggleScreen2} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 2</button>
+          <button onClick={() => setProofRange(proofRange === "last1h" ? null : "last1h")} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
+            style={{ background: proofRange === "last1h" ? "var(--selected-bg)" : "transparent", color: proofRange === "last1h" ? "#00D4F5" : "var(--text-tertiary)", border: proofRange === "last1h" ? "1px solid #00D4F544" : "1px solid transparent" }}>1h</button>
+          <button onClick={toggleFullscreen} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 1</button>
+          <button onClick={toggleScreen2} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 2</button>
         </div>
       )}
       <div className="flex-1 min-h-0 px-2 pb-2">
@@ -1934,46 +1976,77 @@ export default function BeaconHeatmap({
               {staticSvg}
               {/* PFP mode: simplified beacon nodes + moving user avatars */}
               {isPlaybackActive && viewMode === "pfps" ? (<>
-                {beaconList.map((b) => {
-                  const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : (positions[b.id]);
-                  if (!pos) return null;
-                  const count = beaconProofCounts[b.id] || 0;
+                {/* Beacon circles + names/counts */}
+                {(() => {
+                  const pfpCounts: Record<string, number> = {};
+                  if (!selectedUserId && movingPfps) {
+                    for (const p of movingPfps) {
+                      if (!p.moving) pfpCounts[p.beaconId] = (pfpCounts[p.beaconId] || 0) + 1;
+                    }
+                  }
+                  return beaconList.map((b) => {
+                    const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : (positions[b.id]);
+                    if (!pos) return null;
+                    const count = beaconProofCounts[b.id] || 0;
+                    const maxC = Math.max(1, ...Object.values(beaconProofCounts));
+                    const nodeRadius = 18 + (count / maxC) * 22;
+                    return (
+                      <g key={`pb-${b.id}`} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
+                        onMouseDown={(e) => handleMouseDown(b.id, e)}>
+                        <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill="rgba(255,255,255,0.04)"
+                          stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
+                        {!selectedUserId && (
+                          <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
+                            fill="white" fontSize={Math.max(10, nodeRadius * 0.5)}
+                            fontWeight="700" style={{ pointerEvents: "none" }}>
+                            {pfpCounts[b.id] || 0}
+                          </text>
+                        )}
+                        <text x={pos.x} y={pos.y + nodeRadius + 8} textAnchor="middle"
+                          fill="rgba(255,255,255,0.5)" fontSize="6" fontWeight="600" style={{ pointerEvents: "none" }}>
+                          {(names[b.id] || b.name || b.id.substring(0, 10)).substring(0, 12)}
+                        </text>
+                      </g>
+                    );
+                  });
+                })()}
+                {/* PFPs */}
+                {movingPfps && movingPfps.map((p) => {
+                  const isSolo = !!selectedUserId;
+                  // Solo mode: center PFP in beacon; multi mode: use ring position
+                  const beaconPos = isSolo && !p.moving ? positions[p.beaconId] : null;
+                  const cx = beaconPos ? beaconPos.x : p.x;
+                  const cy = beaconPos ? beaconPos.y : p.y;
+                  const count = beaconProofCounts[p.beaconId] || 0;
                   const maxC = Math.max(1, ...Object.values(beaconProofCounts));
                   const nodeRadius = 18 + (count / maxC) * 22;
-                  return (
-                    <g key={`pb-${b.id}`} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
-                      onMouseDown={(e) => handleMouseDown(b.id, e)}>
-                      <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill="rgba(255,255,255,0.04)"
-                        stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
-                      <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
-                        fill="white" fontSize={Math.max(6, nodeRadius * 0.35)}
-                        fontWeight="700" style={{ pointerEvents: "none" }}>
-                        {(names[b.id] || b.name || b.id.substring(0, 10)).substring(0, 10)}
-                      </text>
-                      <text x={pos.x} y={pos.y + nodeRadius + 8} textAnchor="middle"
-                        fill="rgba(255,255,255,0.4)" fontSize="7" fontWeight="600" style={{ pointerEvents: "none" }}>
-                        {count}
-                      </text>
-                    </g>
-                  );
-                })}
-                {movingPfps && movingPfps.map((p) => {
-                  const r = 7;
+                  const r = isSolo && !p.moving ? Math.max(8, nodeRadius * 0.55) : 7;
                   return (
                     <g key={`mpfp-${p.userId}`}>
                       <defs>
                         <clipPath id={`mpfp-clip-${p.userId}`}>
-                          <circle cx={p.x} cy={p.y} r={r} />
+                          <circle cx={cx} cy={cy} r={r} />
                         </clipPath>
                       </defs>
                       {p.moving && (<>
-                        {/* Travel glow */}
-                        <circle cx={p.x} cy={p.y} r={r + 4} fill="rgba(0,149,255,0.08)" />
-                        <circle cx={p.x} cy={p.y} r={r + 2} fill="none" stroke="#0095FF" strokeWidth={1} opacity={0.6} />
+                        <circle cx={cx} cy={cy} r={r + 4} fill="rgba(0,149,255,0.08)" />
+                        <circle cx={cx} cy={cy} r={r + 2} fill="none" stroke="#0095FF" strokeWidth={1} opacity={0.6} />
                       </>)}
-                      <circle cx={p.x} cy={p.y} r={r + 0.5} fill="rgba(0,0,0,0.6)" />
-                      <image href={p.pic} x={p.x - r} y={p.y - r} width={r * 2} height={r * 2}
-                        clipPath={`url(#mpfp-clip-${p.userId})`} style={{ pointerEvents: "none" }} />
+                      <circle cx={cx} cy={cy} r={r + 0.5} fill="rgba(0,0,0,0.6)" />
+                      {p.pic ? (
+                        <foreignObject x={cx - r} y={cy - r} width={r * 2} height={r * 2} style={{ pointerEvents: "none" }}>
+                          <img src={p.pic} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
+                        </foreignObject>
+                      ) : (
+                        <>
+                          <circle cx={cx} cy={cy} r={r} fill="#444" />
+                          <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="central"
+                            fill="white" fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>
+                            {(p.name[0] || "?").toUpperCase()}
+                          </text>
+                        </>
+                      )}
                     </g>
                   );
                 })}
@@ -1993,7 +2066,7 @@ export default function BeaconHeatmap({
           className="flex-shrink-0 flex items-center gap-2 px-3"
           style={{
             height: 40,
-            background: "linear-gradient(180deg, #2a2a32 0%, #222228 100%)",
+            background: "var(--inset-bg)",
             borderTop: "1px solid rgba(0,0,0,0.4)",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
           }}
@@ -2028,13 +2101,13 @@ export default function BeaconHeatmap({
             onClick={handleStop}
             className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
             style={{
-              background: "linear-gradient(180deg, #363640 0%, #2a2a32 100%)",
+              background: "var(--selected-bg)",
               border: "1px solid rgba(255,255,255,0.06)",
               boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
             }}
             title="Stop (live)"
           >
-            <svg width="8" height="8" viewBox="0 0 10 10" fill="#9a9aa6">
+            <svg width="8" height="8" viewBox="0 0 10 10" fill="var(--chart-label)">
               <rect x="1.5" y="1.5" width="7" height="7" rx="1" />
             </svg>
           </button>
@@ -2134,14 +2207,14 @@ export default function BeaconHeatmap({
 
       {/* Settings gear — bottom right */}
       {!isFullscreen && (
-        <button data-nav-zone="2" onClick={() => setShowSettings(!showSettings)}
+        <button onClick={() => setShowSettings(!showSettings)}
           style={{
             position: "absolute", bottom: hasTimeline ? 52 : 12, right: 12, zIndex: 20,
             width: 24, height: 24, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
-            background: "linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%)", border: "1px solid #4a4a52",
+            background: "var(--btn-bg)", border: "1px solid var(--btn-border)",
             cursor: "pointer", opacity: showSettings ? 1 : 0.5,
           }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={showSettings ? "#0095FF" : "#e8e8ec"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={showSettings ? "#0095FF" : "var(--icon-stroke)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
         </button>

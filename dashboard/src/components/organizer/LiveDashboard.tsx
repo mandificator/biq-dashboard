@@ -1,23 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import {
-  Tooltip, ResponsiveContainer, Cell,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  PieChart, Pie,
-} from "recharts";
 import { CrossEventAnalysis, ProcessedData, Profile } from "@/types";
 
 const COLORS = ["#0095FF", "#00D4F5", "#F7941D", "#8CC63F", "#7B5EA7"];
-
-const TOOLTIP_STYLE = {
-  background: "linear-gradient(180deg, #2a2a30 0%, #242428 100%)",
-  border: "1px solid #4a4a52",
-  borderRadius: 8,
-  fontSize: 10,
-  color: "#e8e8ec",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-};
 
 function formatDur(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -25,8 +11,6 @@ function formatDur(minutes: number): string {
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
-
-type LegendSort = "event" | "users" | "dwell" | "proofs";
 
 interface LiveDashboardProps {
   analysis: CrossEventAnalysis;
@@ -42,7 +26,7 @@ const Avatar = React.memo(function Avatar({ src, name, size = 22 }: { src?: stri
   if (!src || failed) {
     return (
       <div className="rounded-full flex items-center justify-center flex-shrink-0 font-bold skeuo-inset"
-        style={{ width: px, height: px, fontSize: size * 0.38, color: "#9a9aa6", borderRadius: "50%" }}>
+        style={{ width: px, height: px, fontSize: size * 0.38, color: "var(--text-secondary)", borderRadius: "50%" }}>
         {initial}
       </div>
     );
@@ -56,35 +40,13 @@ const Avatar = React.memo(function Avatar({ src, name, size = 22 }: { src?: stri
 });
 
 export default function LiveDashboard({ analysis, loadedData, eventNames, eventDates }: LiveDashboardProps) {
-  const [legendSort, setLegendSort] = useState<LegendSort>("event");
-  const [legendSortAsc, setLegendSortAsc] = useState(true);
   const [userEventFilter, setUserEventFilter] = useState<number | null>(null);
-
-  const handleLegendSort = (col: LegendSort) => {
-    if (legendSort === col) setLegendSortAsc((v) => !v);
-    else { setLegendSort(col); setLegendSortAsc(col === "event"); }
-  };
 
   const sortedMetrics = useMemo(() => {
     const items = analysis.eventMetrics.map((em, i) => ({ ...em, origIndex: i }));
-    items.sort((a, b) => {
-      let cmp = 0;
-      switch (legendSort) {
-        case "event": cmp = (eventDates[a.eventId] || 0) - (eventDates[b.eventId] || 0); break;
-        case "users": cmp = a.totalAttendees - b.totalAttendees; break;
-        case "dwell": cmp = a.avgDwellMinutes - b.avgDwellMinutes; break;
-        case "proofs": cmp = a.totalProofs - b.totalProofs; break;
-      }
-      return legendSortAsc ? cmp : -cmp;
-    });
+    items.sort((a, b) => (eventDates[a.eventId] || 0) - (eventDates[b.eventId] || 0));
     return items;
-  }, [analysis.eventMetrics, legendSort, legendSortAsc, eventDates]);
-
-  const colorMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    analysis.eventMetrics.forEach((em, i) => { m[em.eventId] = COLORS[i % COLORS.length]; });
-    return m;
-  }, [analysis.eventMetrics]);
+  }, [analysis.eventMetrics, eventDates]);
 
   const allProfiles = useMemo(() => {
     const profiles: Record<string, Profile> = {};
@@ -101,229 +63,143 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
     return analysis.sharedUsers.filter((u) => u.eventIds.length === userEventFilter);
   }, [analysis.sharedUsers, userEventFilter]);
 
-  // ── Radar chart data — normalized to 0-100 ──
-  const radarData = useMemo(() => {
-    const metrics = ["totalAttendees", "avgDwellMinutes", "totalProofs", "uniqueBeacons", "peakConcurrent"] as const;
-    const labels = ["Attendees", "Dwell", "Proofs", "Beacons", "Peak"];
+  // ── Bar chart data for Attendees, Dwell, Peak ──
+  const barMetrics = useMemo(() => {
+    const events = sortedMetrics.map((em) => ({
+      eventId: em.eventId,
+      name: eventNames[em.eventId] || em.eventName,
+      color: COLORS[em.origIndex % COLORS.length],
+      attendees: em.totalAttendees,
+      dwell: em.avgDwellMinutes,
+      peak: em.peakConcurrent,
+    }));
+    return {
+      events,
+      maxAttendees: Math.max(...events.map((e) => e.attendees), 1),
+      maxDwell: Math.max(...events.map((e) => e.dwell), 1),
+      maxPeak: Math.max(...events.map((e) => e.peak), 1),
+    };
+  }, [sortedMetrics, eventNames]);
 
-    // Find max per metric for normalization
-    const maxes = metrics.map((m) => Math.max(...analysis.eventMetrics.map((em) => em[m]), 1));
-
-    return labels.map((label, li) => {
-      const point: Record<string, string | number> = { metric: label };
-      analysis.eventMetrics.forEach((em, ei) => {
-        point[em.eventId] = Math.round((em[metrics[li]] / maxes[li]) * 100);
-      });
-      return point;
-    });
-  }, [analysis.eventMetrics]);
-
-  // ── Retention donut — filtered users vs rest ──
-  const retentionData = useMemo(() => {
-    const totalUnique = new Set<string>();
-    for (const em of analysis.eventMetrics) {
-      const data = loadedData.get(em.eventId);
-      if (data) data.userDetails.forEach((u) => totalUnique.add(u.userId));
-    }
-    const filtered = filteredUsers.length;
-    const rest = totalUnique.size - filtered;
-    return [
-      { name: userEventFilter === null ? "All" : `${userEventFilter}ev`, value: filtered, color: "#0095FF" },
-      { name: "Other", value: rest, color: "#3a3a42" },
-    ];
-  }, [analysis, loadedData, filteredUsers, userEventFilter]);
-  const retentionPct = retentionData[0].value + retentionData[1].value > 0
-    ? Math.round((retentionData[0].value / (retentionData[0].value + retentionData[1].value)) * 100)
-    : 0;
 
   return (
-    <div className="h-full flex gap-3 overflow-hidden">
-      {/* ── Left 50%: Multi-Metric Profile radar ── */}
-      <div className="skeuo-panel p-4 flex flex-col flex-1 min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-wider mb-2 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
-          Multi-Metric Profile
-        </div>
-        <div className="flex-1 min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-              <PolarGrid stroke="rgba(255,255,255,0.08)" />
-              <PolarAngleAxis dataKey="metric" tick={{ fill: "#c0c0c8", fontSize: 11, fontWeight: 700 }} />
-              <PolarRadiusAxis tick={false} axisLine={false} domain={[0, 100]} />
-              {analysis.eventMetrics.map((em, i) => (
-                <Radar key={em.eventId} name={em.eventName} dataKey={em.eventId}
-                  stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.15} strokeWidth={2} />
-              ))}
-              <Tooltip content={({ active, payload, label }) => {
-                if (!active || !payload?.length) return null;
-                const sorted = [...payload].sort((a, b) => ((b.value as number) || 0) - ((a.value as number) || 0));
-                return (
-                  <div style={{ ...TOOLTIP_STYLE, padding: "6px 10px" }}>
-                    <div style={{ fontSize: 9, color: "#9a9aa6", marginBottom: 4 }}>{label}</div>
-                    {sorted.map((entry) => (
-                      <div key={entry.dataKey as string} style={{ fontSize: 10, color: entry.color as string, fontWeight: 700, lineHeight: "16px" }}>
-                        {entry.value} — {entry.name}
+    <div className="h-full flex flex-col gap-3 overflow-hidden">
+      {/* ── Top row: bars left, users right ── */}
+      <div className="flex gap-3 flex-1 min-h-0">
+        {/* Left: Attendees / Dwell / Peak in separate panels */}
+        <div className="flex flex-col gap-3 flex-1 min-w-0 min-h-0">
+          {([
+            { key: "attendees" as const, label: "Attendees", max: barMetrics.maxAttendees, fmt: (v: number) => String(v) },
+            { key: "dwell" as const, label: "Avg Dwell", max: barMetrics.maxDwell, fmt: (v: number) => formatDur(v) },
+            { key: "peak" as const, label: "Peak Concurrent", max: barMetrics.maxPeak, fmt: (v: number) => String(v) },
+          ]).map((metric) => (
+            <div key={metric.key} className="skeuo-panel p-3 flex flex-col flex-1 min-h-0">
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+                {metric.label}
+              </div>
+              <div className="flex flex-col justify-start gap-[2px] flex-1 min-h-0 overflow-auto">
+                {barMetrics.events.map((ev) => {
+                  const value = ev[metric.key];
+                  const pct = Math.round((value / metric.max) * 100);
+                  return (
+                    <div key={ev.eventId} className="flex flex-col gap-0.5 flex-shrink-0">
+                      <span className="text-[8px] font-bold" style={{ color: ev.color }}>
+                        {ev.name}
+                      </span>
+                      <div className="w-full min-w-0 rounded-sm overflow-hidden relative" style={{ background: "var(--overlay-subtle)", height: 32 }}>
+                        <div className="h-full rounded-sm transition-all duration-300" style={{ width: `${Math.max(pct, 1)}%`, background: ev.color, opacity: 0.85 }} />
+                        <span className="absolute inset-0 flex items-center px-1.5 text-[8px] font-bold tabular-nums" style={{ color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
+                          {metric.fmt(value)} <span className="ml-0.5" style={{ opacity: 0.7 }}>({pct}%)</span>
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                );
-              }} />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-        {/* Legend + Breakdown */}
-        <div className="flex flex-col gap-1 mt-2 pt-2 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          {/* Header — clickable to sort */}
-          <div className="flex items-center mb-0.5">
-            <div style={{ width: 10 }} />
-            {([
-              { key: "event" as LegendSort, label: "Event", width: undefined, ml: 8 },
-              { key: "users" as LegendSort, label: "Users", width: 36, ml: 0 },
-              { key: "dwell" as LegendSort, label: "Dwell", width: 36, ml: 8 },
-              { key: "proofs" as LegendSort, label: "Proofs", width: 42, ml: 8 },
-            ]).map((col) => (
-              <span key={col.key}
-                onClick={() => handleLegendSort(col.key)}
-                className={`text-[7px] font-bold uppercase tracking-wider cursor-pointer select-none transition-colors ${col.key === "event" ? "flex-1 min-w-0 ml-2" : "text-right flex-shrink-0"}`}
-                style={{
-                  color: legendSort === col.key ? "var(--text-primary)" : "var(--text-tertiary)",
-                  width: col.width,
-                  marginLeft: col.key !== "event" ? col.ml : undefined,
-                }}>
-                {legendSort === col.key && col.key !== "event" && <span style={{ fontSize: 4, marginRight: 1 }}>{legendSortAsc ? "▲" : "▼"}</span>}{col.label}{legendSort === col.key && col.key === "event" && <span style={{ fontSize: 4, marginLeft: 1 }}>{legendSortAsc ? "▲" : "▼"}</span>}
-              </span>
-            ))}
-          </div>
-          {sortedMetrics.map((em) => (
-            <div key={em.eventId} className="flex items-center">
-              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: COLORS[em.origIndex % COLORS.length] }} />
-              <span className="text-[9px] font-bold truncate ml-2 flex-1 min-w-0" style={{ color: COLORS[em.origIndex % COLORS.length] }}>
-                {em.eventName}
-              </span>
-              <span className="text-[9px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-primary)", width: 36 }}>
-                {em.totalAttendees}
-              </span>
-              <span className="text-[9px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-primary)", width: 36, marginLeft: 8 }}>
-                {em.avgDwellMinutes}m
-              </span>
-              <span className="text-[9px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-primary)", width: 42, marginLeft: 8 }}>
-                {em.totalProofs.toLocaleString()}
-              </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* ── Right 50%: two rows ── */}
-      <div className="flex flex-col gap-3 flex-1 min-w-0 min-h-0">
-        {/* Top: Users list + Retention */}
-        <div className="skeuo-panel p-3 flex gap-3 flex-1 min-h-0">
-          {/* Users list */}
-          <div className="flex flex-col flex-1 min-w-0 min-h-0">
-            <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
-              <span className="text-[9px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
-                Users ({filteredUsers.length})
-              </span>
+        {/* Right: Users list */}
+        <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0 min-h-0">
+          <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
+            <span className="text-[9px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
+              Users ({filteredUsers.length})
+            </span>
+            <button
+              onClick={() => setUserEventFilter(null)}
+              className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+              style={{ color: userEventFilter === null ? "var(--text-primary)" : "var(--text-secondary)" }}>
+              All
+            </button>
+            {Array.from({ length: maxEventCount }, (_, i) => i + 1).map((n) => (
               <button
-                onClick={() => setUserEventFilter(null)}
+                key={n}
+                onClick={() => setUserEventFilter(userEventFilter === n ? null : n)}
                 className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
-                style={{ color: userEventFilter === null ? "var(--text-primary)" : "var(--text-secondary)" }}>
-                All
+                style={{ color: userEventFilter === n ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                {n}ev
               </button>
-              {Array.from({ length: maxEventCount }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setUserEventFilter(userEventFilter === n ? null : n)}
-                  className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
-                  style={{ color: userEventFilter === n ? "var(--text-primary)" : "var(--text-secondary)" }}>
-                  {n}ev
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto">
-              {filteredUsers.length === 0 && (
-                <div className="flex items-center justify-center h-full">
-                  <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>No users</span>
-                </div>
-              )}
-              {filteredUsers.slice(0, 50).map((user, idx) => {
-                const profile = allProfiles[user.userId];
-                const rawName = profile?.displayName || user.userId.substring(0, 14) + "...";
-                const name = rawName.length > 15 ? rawName.substring(0, 15) + "…" : rawName;
-                return (
-                  <div key={user.userId} className="flex items-center py-1 px-1"
-                    style={{ borderBottom: idx < Math.min(filteredUsers.length, 50) - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined }}>
-                    <Avatar src={profile?.profilePicture} name={name} size={20} />
-                    <span className="text-[9px] font-bold truncate flex-shrink-0 ml-1.5" style={{ color: "var(--text-primary)", width: 95 }}>
-                      {name}
-                    </span>
-                    <div className="flex-1" />
-                    <div className="flex flex-shrink-0">
-                      {analysis.eventMetrics.map((em, i) => {
-                        const attended = user.eventIds.includes(em.eventId);
-                        return (
-                          <div key={em.eventId} style={{ width: 10, height: 10, display: "flex", alignItems: "center" }}>
-                            <div className="rounded-full"
-                              title={eventNames[em.eventId] || em.eventId}
-                              style={{ width: 7, height: 7, background: attended ? COLORS[i % COLORS.length] : "#1a1a1e" }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex-1" />
-                    <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--accent)", width: 22 }}>
-                      {user.eventIds.length} ev
-                    </span>
-                    <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-secondary)", width: 28, marginLeft: 6 }}>
-                      {user.totalProofs}p
-                    </span>
-                    <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-tertiary)", width: 42, marginLeft: 6, whiteSpace: "nowrap" }}>
-                      {formatDur(user.totalDwell)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            ))}
           </div>
-
-          {/* Retention widget */}
-          <div className="w-px flex-shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
-          <div className="flex flex-col items-center justify-center flex-shrink-0" style={{ width: 180 }}>
-            <div className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-tertiary)" }}>
-              Retention
-            </div>
-            <div className="relative" style={{ width: 120, height: 120 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={retentionData} cx="50%" cy="50%" innerRadius={36} outerRadius={54}
-                    dataKey="value" strokeWidth={0}>
-                    {retentionData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-[22px] font-bold" style={{ color: "var(--text-primary)" }}>{retentionPct}%</div>
-                <div className="text-[8px] font-bold" style={{ color: "var(--text-tertiary)" }}>return</div>
+          <div className="flex-1 min-h-0 overflow-auto">
+            {filteredUsers.length === 0 && (
+              <div className="flex items-center justify-center h-full">
+                <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>No users</span>
               </div>
-            </div>
-            <div className="flex flex-col items-center gap-1 mt-2 text-[9px]">
-              <span className="font-bold" style={{ color: "#0095FF" }}>{retentionData[0].value} {retentionData[0].name}</span>
-              <span className="font-bold" style={{ color: "var(--text-tertiary)" }}>{retentionData[1].value} other</span>
-            </div>
+            )}
+            {filteredUsers.slice(0, 50).map((user, idx) => {
+              const profile = allProfiles[user.userId];
+              const rawName = profile?.displayName || user.userId.substring(0, 14) + "...";
+              const name = rawName.length > 15 ? rawName.substring(0, 15) + "…" : rawName;
+              return (
+                <div key={user.userId} className="flex items-center py-1 px-1"
+                  style={{ borderBottom: idx < Math.min(filteredUsers.length, 50) - 1 ? "1px solid var(--overlay-subtle)" : undefined }}>
+                  <Avatar src={profile?.profilePicture} name={name} size={20} />
+                  <span className="text-[9px] font-bold truncate flex-shrink-0 ml-1.5" style={{ color: "var(--text-primary)", width: 95 }}>
+                    {name}
+                  </span>
+                  <div className="flex-1" />
+                  <div className="flex flex-shrink-0">
+                    {analysis.eventMetrics.map((em, i) => {
+                      const attended = user.eventIds.includes(em.eventId);
+                      return (
+                        <div key={em.eventId} style={{ width: 10, height: 10, display: "flex", alignItems: "center" }}>
+                          <div className="rounded-full"
+                            title={eventNames[em.eventId] || em.eventId}
+                            style={{ width: 7, height: 7, background: attended ? COLORS[i % COLORS.length] : "var(--dot-inactive)" }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex-1" />
+                  <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--accent)", width: 22 }}>
+                    {user.eventIds.length} ev
+                  </span>
+                  <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-secondary)", width: 28, marginLeft: 6 }}>
+                    {user.totalProofs}p
+                  </span>
+                  <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-tertiary)", width: 42, marginLeft: 6, whiteSpace: "nowrap" }}>
+                    {formatDur(user.totalDwell)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
+      </div>
 
-        {/* Bottom: Overlap matrix */}
-        <div className="flex gap-3 flex-shrink-0">
-          <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0">
-            <div className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)" }}>
-              User Overlap
-            </div>
-            <div className="overflow-auto">
-              {(() => {
-                const n = analysis.eventMetrics.length;
-                const maxChars = n <= 2 ? 30 : n <= 3 ? 20 : n <= 5 ? 12 : 8;
-                const truncName = (name: string) => name.length > maxChars ? name.substring(0, maxChars - 1) + "…" : name;
-                return (
+      {/* ── Bottom center: User Overlap ── */}
+      <div className="skeuo-panel p-3 flex flex-col flex-shrink-0">
+        <div className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)" }}>
+          User Overlap
+        </div>
+        <div className="overflow-auto">
+          {(() => {
+            const n = analysis.eventMetrics.length;
+            const maxChars = n <= 2 ? 30 : n <= 3 ? 20 : n <= 5 ? 12 : 8;
+            const truncName = (name: string) => name.length > maxChars ? name.substring(0, maxChars - 1) + "…" : name;
+            return (
               <table className="text-[8px] w-full" style={{ tableLayout: "fixed" }}>
                 <thead>
                   <tr>
@@ -371,11 +247,8 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
                   ))}
                 </tbody>
               </table>
-                );
-              })()}
-            </div>
-          </div>
-
+            );
+          })()}
         </div>
       </div>
     </div>

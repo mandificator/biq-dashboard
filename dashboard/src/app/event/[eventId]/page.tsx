@@ -116,6 +116,7 @@ export default function EventPage() {
   const [selectedBeaconId, setSelectedBeaconId] = useState<string | null>(null);
   const [filteredBeaconIds, setFilteredBeaconIds] = useState<string[] | null>(null);
   const [playbackTime, setPlaybackTime] = useState<number | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
 
   const selectedUserJourney = useMemo(() => {
     if (!selectedUserId || !processed) return undefined;
@@ -136,8 +137,13 @@ export default function EventPage() {
     setError(null);
     setSelectedUserId(null);
     try {
-      const data = await fetchData(eid);
+      const data = await fetchData(eid) as AnalyticsResponse & { organizers?: Record<string, { name: string }> };
       setRawData(data);
+      // Extract organizer name
+      const orgId = data.event.organizerId?.[0];
+      if (orgId && data.organizers?.[orgId]) {
+        setOrgName(data.organizers[orgId].name);
+      }
       const proc = processAnalytics(data);
       setProcessed(proc);
       lastUpdateRef.current = data.lastUpdate;
@@ -150,6 +156,11 @@ export default function EventPage() {
 
       const savedNames = loadFromStorage<Record<string, string>>(`biq-beacon-names-${eid}`, {});
       setBeaconNames(savedNames);
+
+      // Auto-select first user
+      if (proc.userDetails.length > 0) {
+        setSelectedUserId(proc.userDetails[0].userId);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -162,12 +173,15 @@ export default function EventPage() {
     if (eventId) loadInitial(eventId);
   }, [eventId, loadInitial]);
 
+  const rawDataRef = useRef(rawData);
+  rawDataRef.current = rawData;
+
   const refreshData = useCallback(async () => {
-    if (!eventId || !rawData || !lastUpdateRef.current) return;
+    if (!eventId || !rawDataRef.current || !lastUpdateRef.current) return;
     try {
       const update = await fetchData(eventId, lastUpdateRef.current);
       if (update.proofs && update.proofs.length > 0) {
-        const merged = mergeAnalytics(rawData, update);
+        const merged = mergeAnalytics(rawDataRef.current, update);
         setRawData(merged);
         setProcessed(processAnalytics(merged));
       }
@@ -176,7 +190,7 @@ export default function EventPage() {
     } catch (err) {
       console.error("Refresh failed:", err);
     }
-  }, [eventId, rawData, fetchData]);
+  }, [eventId, fetchData]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -202,83 +216,16 @@ export default function EventPage() {
     });
   }, [eventId]);
 
+  const handleChartClickUser = useCallback((uid: string) => {
+    setSelectedUserId(uid);
+    setActiveTab("users");
+  }, []);
+
   useEffect(() => {
     if (activeTab !== "users") setSelectedUserId(null);
     if (activeTab !== "beacons") { setSelectedBeaconId(null); setFilteredBeaconIds(null); }
   }, [activeTab]);
 
-  // ── Global keyboard navigation ──
-  const [navZone, setNavZone] = useState(0);
-  const [navItem, setNavItem] = useState(0);
-
-  useEffect(() => { setNavItem(0); }, [navZone, activeTab]);
-  useEffect(() => { setNavZone(0); }, [activeTab]);
-
-  useEffect(() => {
-    document.querySelectorAll("[data-nav-active]").forEach((el) => el.removeAttribute("data-nav-active"));
-    const items = document.querySelectorAll(`[data-nav-zone="${navZone}"]`);
-    const clamped = Math.min(navItem, items.length - 1);
-    if (clamped >= 0 && items[clamped]) {
-      items[clamped].setAttribute("data-nav-active", "true");
-      (items[clamped] as HTMLElement).scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-    }
-  }, [navZone, navItem]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-
-      const getCount = (z: number) => document.querySelectorAll(`[data-nav-zone="${z}"]`).length;
-      const maxZone = activeTab === "overview" ? 2 : 1;
-
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        setNavItem((prev) => Math.min(prev + 1, getCount(navZone) - 1));
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        setNavItem((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        if (navZone === 3) {
-          setNavItem((prev) => Math.min(prev + 1, getCount(3) - 1));
-        } else {
-          setNavZone((prev) => Math.min(prev + 1, maxZone));
-        }
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        if (navZone === 3) {
-          if (navItem === 0) { setNavZone(2); }
-          else { setNavItem((prev) => Math.max(prev - 1, 0)); }
-        } else {
-          setNavZone((prev) => Math.max(prev - 1, 0));
-        }
-      } else if (e.key === " ") {
-        e.preventDefault();
-        const items = document.querySelectorAll(`[data-nav-zone="${navZone}"]`);
-        const el = items[Math.min(navItem, items.length - 1)] as HTMLElement;
-        if (el) {
-          if (el.tagName === "INPUT" && (el as HTMLInputElement).type === "checkbox") {
-            (el as HTMLInputElement).click();
-          } else {
-            el.click();
-          }
-          if (navZone === 2 && activeTab === "overview") {
-            setTimeout(() => {
-              if (getCount(3) > 0) { setNavZone(3); setNavItem(0); }
-            }, 50);
-          }
-        }
-      } else if (e.key === "e" || e.key === "E") {
-        if (processed) exportCSV(processed);
-      } else if (e.key === "Escape") {
-        if (navZone === 3) setNavZone(2);
-        else setNavZone(0);
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [navZone, navItem, activeTab, processed]);
 
   const beaconMapProps = useMemo(() => processed ? {
     beacons: processed.beacons,
@@ -293,28 +240,48 @@ export default function EventPage() {
     eventName: processed.event.name,
   } : null, [processed, beaconPositions, handlePositionChange, beaconNames, handleNameChange]);
 
+  // Pre-sort proofs and pre-compute per-user timelines once
+  const sortedProofs = useMemo(() => {
+    if (!processed) return [];
+    return [...processed.proofs].sort((a, b) => a.time - b.time);
+  }, [processed]);
+
+  const userTimelines = useMemo(() => {
+    const map: Record<string, { beaconId: string; time: number }[]> = {};
+    for (const p of sortedProofs) {
+      if (!map[p.userId]) map[p.userId] = [];
+      map[p.userId].push({ beaconId: p.beaconId, time: p.time });
+    }
+    return map;
+  }, [sortedProofs]);
+
   const playbackMapOverrides = useMemo(() => {
     if (playbackTime == null || !processed) return null;
 
-    const filteredProofs = processed.proofs.filter((p) => p.time <= playbackTime);
+    // Binary search for cutoff index in pre-sorted proofs
+    let lo = 0, hi = sortedProofs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sortedProofs[mid].time <= playbackTime) lo = mid + 1;
+      else hi = mid;
+    }
 
     const counts: Record<string, number> = {};
-    for (const p of filteredProofs) {
-      counts[p.beaconId] = (counts[p.beaconId] || 0) + 1;
+    for (let i = 0; i < lo; i++) {
+      const bid = sortedProofs[i].beaconId;
+      counts[bid] = (counts[bid] || 0) + 1;
     }
 
-    const userProofs: Record<string, typeof filteredProofs> = {};
-    for (const p of filteredProofs) {
-      if (!userProofs[p.userId]) userProofs[p.userId] = [];
-      userProofs[p.userId].push(p);
-    }
     const transitionMap: Record<string, number> = {};
-    for (const uid of Object.keys(userProofs)) {
-      const ups = userProofs[uid].sort((a, b) => a.time - b.time);
-      for (let i = 1; i < ups.length; i++) {
-        if (ups[i].beaconId === ups[i - 1].beaconId) continue;
-        const key = [ups[i - 1].beaconId, ups[i].beaconId].sort().join("||");
-        transitionMap[key] = (transitionMap[key] || 0) + 1;
+    for (const timeline of Object.values(userTimelines)) {
+      let prevBeacon: string | null = null;
+      for (const entry of timeline) {
+        if (entry.time > playbackTime) break;
+        if (prevBeacon !== null && prevBeacon !== entry.beaconId) {
+          const key = [prevBeacon, entry.beaconId].sort().join("||");
+          transitionMap[key] = (transitionMap[key] || 0) + 1;
+        }
+        prevBeacon = entry.beaconId;
       }
     }
     const transitions = Object.entries(transitionMap).map(([key, count]) => {
@@ -322,8 +289,8 @@ export default function EventPage() {
       return { from, to, count };
     });
 
-    return { beaconProofCounts: counts, transitions, proofs: filteredProofs };
-  }, [playbackTime, processed]);
+    return { beaconProofCounts: counts, transitions, proofs: sortedProofs.slice(0, lo) };
+  }, [playbackTime, processed, sortedProofs, userTimelines]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: "var(--bg-texture)" }}>
@@ -331,26 +298,34 @@ export default function EventPage() {
       <header
         className="flex-shrink-0 flex items-center justify-between px-5 h-[52px]"
         style={{
-          background: "linear-gradient(180deg, #2e2e34 0%, #242428 60%, #202024 100%)",
-          borderBottom: "1px solid rgba(0,0,0,0.5)",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
+          background: "var(--header-bg)",
+          borderBottom: "1px solid var(--header-border)",
+          boxShadow: "var(--header-shadow)",
         }}
       >
-        <div className="flex items-center gap-3">
-          {processed && (
-            <div className="flex items-center gap-2">
-              {processed.event.image && (
-                <img
-                  src={processed.event.image} alt=""
-                  className="w-6 h-6 rounded-md object-cover"
-                  style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
-                />
-              )}
-              <span className="text-[11px] font-bold" style={{ color: "var(--text-secondary)" }}>
-                {processed.event.name}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center gap-1.5">
+          {processed && (<>
+            {processed.event.organizerId?.[0] && (
+              <>
+                <a href={`/organizer/${processed.event.organizerId[0]}`}
+                  className="text-[10px] font-bold hover:underline"
+                  style={{ color: "var(--text-tertiary)" }}>
+                  {orgName || "Organizer"}
+                </a>
+                <span className="text-[9px]" style={{ color: "var(--text-tertiary)", opacity: 0.5 }}>/</span>
+              </>
+            )}
+            {processed.event.image && (
+              <img
+                src={processed.event.image} alt=""
+                className="w-5 h-5 rounded object-cover"
+                style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+              />
+            )}
+            <span className="text-[11px] font-bold" style={{ color: "var(--text-secondary)" }}>
+              {processed.event.name}
+            </span>
+          </>)}
         </div>
 
         {processed && (
@@ -358,17 +333,12 @@ export default function EventPage() {
             {(["overview", "users", "beacons"] as const).map((tab) => (
               <button
                 key={tab}
-                data-nav-zone="0"
                 onClick={() => setActiveTab(tab)}
                 className="px-3.5 py-1 rounded-md text-[11px] font-bold capitalize transition-all duration-100"
                 style={{
-                  background: activeTab === tab
-                    ? "linear-gradient(180deg, #363640 0%, #2a2a32 100%)"
-                    : "transparent",
+                  background: activeTab === tab ? "var(--selected-bg)" : "transparent",
                   color: activeTab === tab ? "var(--text-primary)" : "var(--text-tertiary)",
-                  boxShadow: activeTab === tab
-                    ? "1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)"
-                    : "none",
+                  boxShadow: activeTab === tab ? "var(--selected-shadow)" : "none",
                 }}
               >
                 {tab === "users" ? <>Users <span style={{ color: "var(--text-tertiary)" }}>({processed.totalAttendees})</span></> : tab === "beacons" ? <>Beacons <span style={{ color: "var(--text-tertiary)" }}>({Object.keys(processed.beacons).length})</span></> : tab}
@@ -400,7 +370,7 @@ export default function EventPage() {
               </div>
               <button
                 onClick={() => exportCSV(processed)}
-                className="skeuo-btn px-3 py-1.5 text-[11px] font-bold"
+                className="skeuo-btn px-3 py-1.5 text-[11px] font-bold mr-8"
                 style={{ color: "#8CC63F", borderColor: "#8CC63F44" }}
               >
                 Export
@@ -438,36 +408,41 @@ export default function EventPage() {
                 {activeTab === "overview" && (
                   <>
                     <div className="flex-1 min-h-0">
-                      <CheckInChart data={processed.checkInTimeline} profiles={processed.profiles} onClickUser={(uid) => { setSelectedUserId(uid); setActiveTab("users"); }} />
+                      <CheckInChart data={processed.checkInTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
                     </div>
                     <div className="flex-1 min-h-0">
-                      <CheckOutChart data={processed.checkOutTimeline} profiles={processed.profiles} onClickUser={(uid) => { setSelectedUserId(uid); setActiveTab("users"); }} />
+                      <CheckOutChart data={processed.checkOutTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
                     </div>
                     <div className="flex-1 min-h-0">
-                      <DwellTimeChart data={processed.dwellTimes} profiles={processed.profiles} onClickUser={(uid) => { setSelectedUserId(uid); setActiveTab("users"); }} />
+                      <DwellTimeChart data={processed.dwellTimes} profiles={processed.profiles} onClickUser={handleChartClickUser} />
                     </div>
                   </>
                 )}
                 {activeTab === "users" && (() => {
                   const selectedUser = selectedUserId ? processed.userDetails.find(u => u.userId === selectedUserId) : null;
                   return (
-                    <div className="flex-1 min-h-0 flex flex-col gap-3">
-                      {selectedUser ? (
-                        <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} />
-                      ) : (
-                        <div className="skeuo-panel flex items-center justify-center" style={{ minHeight: 80 }}>
-                          <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-h-0">
-                        <BeaconHeatmap
-                          {...beaconMapProps}
-                          selectedUserJourney={selectedUserJourney}
+                    <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
+                      <div className="w-[220px] flex-shrink-0 min-h-0 h-full">
+                        <UsersTab
+                          users={processed.userDetails}
+                          beacons={processed.beacons}
+                          beaconNames={beaconNames}
+                          selectedUserId={selectedUserId}
+                          onSelectUser={setSelectedUserId}
                           eventStartTime={processed.event.startTime}
                           eventEndTime={processed.event.endTime}
-                          onPlaybackTime={setPlaybackTime}
-                          playbackTime={playbackTime}
+                          dwellTimes={processed.dwellTimes}
+                          profiles={processed.profiles}
                         />
+                      </div>
+                      <div className="flex-1 min-w-0 min-h-0 h-full overflow-hidden">
+                        {selectedUser ? (
+                          <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} onTimeClick={setPlaybackTime} />
+                        ) : (
+                          <div className="skeuo-panel h-full flex items-center justify-center">
+                            <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -492,16 +467,14 @@ export default function EventPage() {
               <div className="w-[40%] flex-shrink-0 h-full flex flex-col gap-3">
                 {activeTab === "users" && (
                   <div className="flex-1 min-h-0">
-                    <UsersTab
-                      users={processed.userDetails}
-                      beacons={processed.beacons}
-                      beaconNames={beaconNames}
+                    <BeaconHeatmap
+                      {...beaconMapProps}
+                      selectedUserJourney={selectedUserJourney}
                       selectedUserId={selectedUserId}
-                      onSelectUser={setSelectedUserId}
                       eventStartTime={processed.event.startTime}
                       eventEndTime={processed.event.endTime}
-                      dwellTimes={processed.dwellTimes}
-                      profiles={processed.profiles}
+                      onPlaybackTime={setPlaybackTime}
+                      playbackTime={playbackTime}
                     />
                   </div>
                 )}

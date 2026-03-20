@@ -106,7 +106,7 @@ function PinnedPopup({ pinned, popupRef, containerRef, profiles, onClickUser, co
         overflowY: "auto",
       }}
     >
-      <div style={{ color: "#9a9aa6", fontSize: 9, marginBottom: 4 }}>{pinned.label}</div>
+      <div style={{ color: "var(--chart-label)", fontSize: 9, marginBottom: 4 }}>{pinned.label}</div>
       <div style={{ color, fontSize: 12, fontWeight: 700, marginBottom: pinned.userIds.length > 0 ? 6 : 0 }}>
         {pinned.count} {noun}
       </div>
@@ -120,11 +120,11 @@ function PinnedPopup({ pinned, popupRef, containerRef, profiles, onClickUser, co
                 key={uid}
                 onClick={() => onClickUser(uid)}
                 style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "2px 4px", borderRadius: 4 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.08)"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "var(--overlay-divider)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
               >
                 <MiniAvatar src={p?.profilePicture} name={name} size={16} />
-                <span style={{ fontSize: 10, color: "#e8e8ec" }}>{name}</span>
+                <span style={{ fontSize: 10, color: "var(--chart-text)" }}>{name}</span>
               </div>
             );
           })}
@@ -146,10 +146,10 @@ interface DwellPoint {
 }
 
 const tooltipContentStyle = {
-  background: "linear-gradient(180deg, #2a2a30 0%, #222226 100%)",
-  border: "1px solid rgba(255,255,255,0.1)",
+  background: "var(--tooltip-bg)",
+  border: "1px solid var(--tooltip-border)",
   borderRadius: 8,
-  color: "#e8e8ec",
+  color: "var(--chart-text)",
   fontSize: 11,
   fontFamily: "var(--font-space-mono), monospace",
   padding: "8px 12px",
@@ -178,7 +178,7 @@ function MiniAvatar({ src, name, size = 20 }: { src?: string; name: string; size
     return (
       <div
         className="rounded-full flex items-center justify-center flex-shrink-0 font-bold skeuo-inset"
-        style={{ width: px, height: px, fontSize: size * 0.38, color: "#9a9aa6", borderRadius: "50%" }}
+        style={{ width: px, height: px, fontSize: size * 0.38, color: "var(--chart-label)", borderRadius: "50%" }}
       >
         {name[0]?.toUpperCase() || "?"}
       </div>
@@ -232,19 +232,19 @@ export const CheckInChart = React.memo(function CheckInChart({
                 <stop offset="100%" stopColor="#0095FF" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="time" tick={{ fill: "#66666e", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-            <YAxis tick={{ fill: "#66666e", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <XAxis dataKey="time" tick={{ fill: "var(--chart-tick)", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <YAxis tick={{ fill: "var(--chart-tick)", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} allowDecimals={false} />
             {!pinned && <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
               const pt = payload[0].payload as { time: string; value: number; userIds: string[] };
               return (
                 <div style={{ ...tooltipContentStyle, minWidth: 140, maxHeight: 200, overflowY: "auto" }}>
-                  <div style={{ color: "#9a9aa6", fontSize: 9, marginBottom: 4 }}>{pt.time}</div>
+                  <div style={{ color: "var(--chart-label)", fontSize: 9, marginBottom: 4 }}>{pt.time}</div>
                   <div style={{ color: "#0095FF", fontSize: 12, fontWeight: 700, marginBottom: pt.userIds.length > 0 ? 6 : 0 }}>{pt.value} check-ins</div>
                   {pt.userIds.map((uid) => { const p = profiles[uid]; const name = p?.displayName || uid.substring(0, 10); return (
                     <div key={uid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
                       <MiniAvatar src={p?.profilePicture} name={name} size={16} />
-                      <span style={{ fontSize: 10, color: "#e8e8ec" }}>{name}</span>
+                      <span style={{ fontSize: 10, color: "var(--chart-text)" }}>{name}</span>
                     </div>
                   ); })}
                 </div>
@@ -301,19 +301,19 @@ export const CheckOutChart = React.memo(function CheckOutChart({
                 <stop offset="100%" stopColor="#F7941D" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="time" tick={{ fill: "#66666e", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-            <YAxis tick={{ fill: "#66666e", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <XAxis dataKey="time" tick={{ fill: "var(--chart-tick)", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <YAxis tick={{ fill: "var(--chart-tick)", fontSize: 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} allowDecimals={false} />
             {!pinned && <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
               const pt = payload[0].payload as { time: string; value: number; userIds: string[] };
               return (
                 <div style={{ ...tooltipContentStyle, minWidth: 140, maxHeight: 200, overflowY: "auto" }}>
-                  <div style={{ color: "#9a9aa6", fontSize: 9, marginBottom: 4 }}>{pt.time}</div>
+                  <div style={{ color: "var(--chart-label)", fontSize: 9, marginBottom: 4 }}>{pt.time}</div>
                   <div style={{ color: "#F7941D", fontSize: 12, fontWeight: 700, marginBottom: pt.userIds.length > 0 ? 6 : 0 }}>{pt.value} check-outs</div>
                   {pt.userIds.map((uid) => { const p = profiles[uid]; const name = p?.displayName || uid.substring(0, 10); return (
                     <div key={uid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
                       <MiniAvatar src={p?.profilePicture} name={name} size={16} />
-                      <span style={{ fontSize: 10, color: "#e8e8ec" }}>{name}</span>
+                      <span style={{ fontSize: 10, color: "var(--chart-text)" }}>{name}</span>
                     </div>
                   ); })}
                 </div>
