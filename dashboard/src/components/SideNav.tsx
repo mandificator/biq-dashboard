@@ -54,26 +54,15 @@ export default function SideNav() {
         boxShadow: "1px 0 4px rgba(0,0,0,0.3), inset -1px 0 0 rgba(255,255,255,0.03)",
       }}
     >
-      {/* Logo — non-clickable on dedicated org pages */}
-      {onDedicatedOrgPage ? (
-        <div className="mb-3 flex-shrink-0">
-          <img
-            src="/logo_biq.png"
-            alt="biq"
-            className="w-7 h-7 object-cover rounded"
-            style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
-          />
-        </div>
-      ) : (
-        <Link href="/organizer" className="mb-3 flex-shrink-0">
-          <img
-            src="/logo_biq.png"
-            alt="biq"
-            className="w-7 h-7 object-cover rounded"
-            style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
-          />
-        </Link>
-      )}
+      {/* Logo — always links to organizer list */}
+      <Link href="/organizer" className="mb-3 flex-shrink-0">
+        <img
+          src="/logo_biq.png"
+          alt="biq"
+          className="w-7 h-7 object-cover rounded"
+          style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+        />
+      </Link>
 
       <div className="w-6 h-px mb-2" style={{ background: "rgba(255,255,255,0.06)" }} />
 
