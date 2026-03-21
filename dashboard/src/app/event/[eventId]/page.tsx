@@ -124,6 +124,21 @@ export default function EventPage() {
     return user?.beaconTimeline;
   }, [selectedUserId, processed]);
 
+  // Per-beacon dwell time (seconds) for selected user — filtered by playbackTime
+  const selectedUserBeaconDwell = useMemo<Record<string, number> | undefined>(() => {
+    if (!selectedUserJourney || selectedUserJourney.length < 2) return undefined;
+    const cutoff = playbackTime ?? Infinity;
+    const dwell: Record<string, number> = {};
+    for (let i = 0; i < selectedUserJourney.length - 1; i++) {
+      if (selectedUserJourney[i].time > cutoff) break;
+      const bid = selectedUserJourney[i].beaconId;
+      const nextTime = Math.min(selectedUserJourney[i + 1].time, cutoff);
+      const duration = nextTime - selectedUserJourney[i].time;
+      if (duration > 0) dwell[bid] = (dwell[bid] || 0) + duration;
+    }
+    return Object.keys(dwell).length > 0 ? dwell : undefined;
+  }, [selectedUserJourney, playbackTime]);
+
   const fetchData = useCallback(async (eid: string, since?: number) => {
     const params = new URLSearchParams({ eventId: eid });
     if (since) params.append("since", since.toString());
@@ -471,6 +486,7 @@ export default function EventPage() {
                       {...beaconMapProps}
                       selectedUserJourney={selectedUserJourney}
                       selectedUserId={selectedUserId}
+                      userBeaconDwell={selectedUserBeaconDwell}
                       eventStartTime={processed.event.startTime}
                       eventEndTime={processed.event.endTime}
                       onPlaybackTime={setPlaybackTime}

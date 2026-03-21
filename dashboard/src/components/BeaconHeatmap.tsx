@@ -192,6 +192,7 @@ interface Props {
   onNameChange: (beaconId: string, name: string) => void;
   selectedUserJourney?: { beaconId: string; time: number }[];
   selectedUserId?: string | null;
+  userBeaconDwell?: Record<string, number>; // seconds per beacon for selected user
   proofs?: Proof[];
   selectedBeaconId?: string | null;
   onSelectBeacon?: (id: string | null) => void;
@@ -214,6 +215,7 @@ export default function BeaconHeatmap({
   onNameChange,
   selectedUserJourney,
   selectedUserId,
+  userBeaconDwell,
   proofs,
   selectedBeaconId,
   onSelectBeacon,
@@ -1128,7 +1130,7 @@ export default function BeaconHeatmap({
   const interactiveSvg = (
     <>
       {/* Transition lines */}
-      {!hasJourney && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
+      {!hasJourney && !selectedUserId && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
         const fromPos = getPos(t.from);
         const toPos = getPos(t.to);
         if (!fromPos || !toPos) return null;
@@ -1195,36 +1197,82 @@ export default function BeaconHeatmap({
       })()}
 
       {/* Beacon nodes */}
-      {!(isFullscreen && fsSettings.orbitCenter) && beaconList.map((b) => {
-        const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : activePositions[b.id];
-        if (!pos) return null;
-        if (visibleBeaconIds && !visibleBeaconIds.has(b.id)) return null;
-        if (fsActiveBeaconIds && !fsActiveBeaconIds.has(b.id)) return null;
-        const count = beaconProofCounts[b.id] || 0;
-        const nodeRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (count / maxCount) * 22;
-        const color = getHeatColor(count);
-        const isInJourney = journeySummary ? journeySummary.beaconIds.has(b.id) : false;
-        const isJourneyStart = journeySummary ? b.id === journeySummary.startBeaconId : false;
-        const isJourneyEnd = journeySummary ? b.id === journeySummary.endBeaconId : false;
-        const dimmed = (!!journeySummary && !isInJourney) || (!!activeSelectedId && b.id !== activeSelectedId) || (!!filteredBeaconIds && !filteredBeaconIds.includes(b.id));
-        return (
-          <g key={b.id} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
-            onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.25 : 1}>
-            <circle cx={pos.x} cy={pos.y} r={nodeRadius * 2.5} fill={`url(#glow-${b.id})`} />
-            <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill={color} opacity={0.12}
-              stroke={activeSelectedId === b.id ? "#ffffff" : isJourneyStart ? "#00D4F5" : isJourneyEnd ? "#F7941D" : color}
-              strokeWidth={activeSelectedId === b.id ? 3 : isInJourney ? 2.5 : 1.5}
-              strokeOpacity={activeSelectedId === b.id ? 0.9 : isInJourney ? 0.8 : 0.5} />
-            <circle cx={pos.x} cy={pos.y} r={nodeRadius * 0.55} fill={color} opacity={0.95} />
-            <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
-              fill={isFullscreen ? fsSettings.textColor : "white"} fontSize={Math.max(5, nodeRadius * 0.25)}
-              fontWeight="700" style={{ pointerEvents: "none" }}>{truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 10)}</text>
-          </g>
-        );
-      })}
+      {!(isFullscreen && fsSettings.orbitCenter) && (() => {
+        // Dwell heatmap: blue (low) → yellow → red (high)
+        const maxDwell = userBeaconDwell ? Math.max(1, ...Object.values(userBeaconDwell)) : 0;
+        const dwellHeatColor = (seconds: number) => {
+          const t = Math.min(1, seconds / maxDwell);
+          // blue → cyan → yellow → orange → red
+          if (t < 0.25) { const s = t / 0.25; return `rgb(${Math.round(30 + s * 0)}, ${Math.round(100 + s * 155)}, ${Math.round(200 + s * 55)})`; }
+          if (t < 0.5) { const s = (t - 0.25) / 0.25; return `rgb(${Math.round(30 + s * 225)}, ${Math.round(255)}, ${Math.round(255 - s * 55)})`; }
+          if (t < 0.75) { const s = (t - 0.5) / 0.25; return `rgb(${Math.round(255)}, ${Math.round(255 - s * 130)}, ${Math.round(200 - s * 200)})`; }
+          const s = (t - 0.75) / 0.25; return `rgb(${Math.round(255 - s * 35)}, ${Math.round(125 - s * 95)}, 0)`;
+        };
+
+        // When user selected: base radius is small, grows with dwell
+        const baseRadius = 16;
+        const totalDwell = userBeaconDwell ? Object.values(userBeaconDwell).reduce((a, b) => a + b, 0) : 0;
+        const userActive = selectedUserId && totalDwell > 0;
+
+        return beaconList.map((b) => {
+          const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : activePositions[b.id];
+          if (!pos) return null;
+          if (visibleBeaconIds && !visibleBeaconIds.has(b.id)) return null;
+          if (fsActiveBeaconIds && !fsActiveBeaconIds.has(b.id)) return null;
+          const count = beaconProofCounts[b.id] || 0;
+          const defaultRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (count / maxCount) * 22;
+          const defaultColor = getHeatColor(count);
+          const isInJourney = journeySummary ? journeySummary.beaconIds.has(b.id) : false;
+          const isJourneyStart = journeySummary ? b.id === journeySummary.startBeaconId : false;
+          const isJourneyEnd = journeySummary ? b.id === journeySummary.endBeaconId : false;
+          const dimmed = (!!journeySummary && !isInJourney) || (!!activeSelectedId && b.id !== activeSelectedId) || (!!filteredBeaconIds && !filteredBeaconIds.includes(b.id));
+
+          // User-specific mode: grey + small when not visited, colored + growing with dwell
+          const dwellSec = userBeaconDwell?.[b.id] ?? 0;
+          const hasVisited = selectedUserId && dwellSec > 0;
+          let color: string;
+          let nodeRadius: number;
+          let fillOpacity: number;
+          let coreOpacity: number;
+
+          if (selectedUserId && !isFullscreen) {
+            if (hasVisited) {
+              color = dwellHeatColor(dwellSec);
+              // Radius grows from base to max based on proportion of total dwell
+              nodeRadius = baseRadius + (dwellSec / Math.max(1, maxDwell)) * 24;
+              fillOpacity = 0.35;
+              coreOpacity = 1;
+            } else {
+              // Not visited yet: grey, small
+              color = "#555";
+              nodeRadius = baseRadius;
+              fillOpacity = 0.08;
+              coreOpacity = 0.4;
+            }
+          } else {
+            color = defaultColor;
+            nodeRadius = defaultRadius;
+            fillOpacity = 0.12;
+            coreOpacity = 0.95;
+          }
+
+          return (
+            <g key={b.id} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
+              onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.25 : 1}>
+              <circle cx={pos.x} cy={pos.y} r={nodeRadius * 2.5} fill={hasVisited ? `url(#glow-${b.id})` : "none"} />
+              <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill={color} opacity={fillOpacity} />
+              <circle cx={pos.x} cy={pos.y} r={nodeRadius * 0.55} fill={color} opacity={coreOpacity} />
+              <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
+                fill={isFullscreen ? fsSettings.textColor : (selectedUserId && !hasVisited) ? "var(--text-tertiary)" : "white"}
+                fontSize={Math.max(5, nodeRadius * 0.25)}
+                fontWeight="700" style={{ pointerEvents: "none", textShadow: hasVisited ? "0 1px 2px rgba(0,0,0,0.8)" : "none" }}>{truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 10)}</text>
+            </g>
+          );
+        });
+      })()}
 
       {/* Transition count labels */}
-      {!hasJourney && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
+      {!hasJourney && !selectedUserId && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
         const fromPos = getPos(t.from); const toPos = getPos(t.to);
         if (!fromPos || !toPos) return null;
         const involves = activeSelectedId && (t.from === activeSelectedId || t.to === activeSelectedId);
@@ -2060,6 +2108,21 @@ export default function BeaconHeatmap({
         </div>
       </div>
 
+      {/* Dwell heatmap legend */}
+      {userBeaconDwell && !isFullscreen && (() => {
+        const maxDwell = Math.max(1, ...Object.values(userBeaconDwell));
+        const formatDwellLegend = (s: number) => s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)}m`;
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md"
+            style={{ position: "absolute", bottom: hasTimeline ? 52 : 12, left: 12, zIndex: 20, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+            <span className="text-[7px] font-bold" style={{ color: "var(--text-tertiary)" }}>DWELL</span>
+            <span className="text-[6px]" style={{ color: "var(--text-tertiary)" }}>{formatDwellLegend(0)}</span>
+            <div style={{ width: 60, height: 6, borderRadius: 3, background: "linear-gradient(90deg, rgb(30,100,200), rgb(30,255,255), rgb(255,255,200), rgb(255,125,0), rgb(220,30,0))" }} />
+            <span className="text-[6px]" style={{ color: "var(--text-tertiary)" }}>{formatDwellLegend(maxDwell)}</span>
+          </div>
+        );
+      })()}
+
       {/* ═══ TIMELINE PLAYER ═══ */}
       {hasTimeline && !isFullscreen && (
         <div
@@ -2221,7 +2284,10 @@ export default function BeaconHeatmap({
       )}
 
       {/* Settings panel (normal view) */}
-      {!isFullscreen && showSettings && settingsPanel}
+      {!isFullscreen && showSettings && (<>
+        <div style={{ position: "absolute", inset: 0, zIndex: 25 }} onClick={() => setShowSettings(false)} />
+        {settingsPanel}
+      </>)}
 
       <style jsx>{`
         @keyframes dashMove { to { stroke-dashoffset: -20; } }
