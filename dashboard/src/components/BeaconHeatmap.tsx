@@ -203,6 +203,7 @@ interface Props {
   eventEndTime?: number;
   onPlaybackTime?: (time: number | null) => void;
   playbackTime?: number | null;
+  onClickUser?: (userId: string) => void;
 }
 
 export default function BeaconHeatmap({
@@ -226,6 +227,7 @@ export default function BeaconHeatmap({
   eventEndTime,
   onPlaybackTime,
   playbackTime,
+  onClickUser,
 }: Props) {
   const beaconList = useMemo(() => Object.values(beacons), [beacons]);
   const maxCount = useMemo(
@@ -244,6 +246,22 @@ export default function BeaconHeatmap({
     { id: "50-100", label: "50–100", min: 50, max: 100 },
     { id: "100+", label: "100+", min: 100, max: Infinity },
   ];
+
+  // PFP hover tooltip
+  const [pfpTooltip, setPfpTooltip] = useState<{ name: string; x: number; y: number } | null>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlePfpEnter = useCallback((name: string, e: React.MouseEvent) => {
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    const rect = (e.currentTarget as Element).closest("svg")!.getBoundingClientRect();
+    setPfpTooltip({ name, x: e.clientX - rect.left, y: e.clientY - rect.top - 20 });
+  }, []);
+  const handlePfpMove = useCallback((name: string, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as Element).closest("svg")!.getBoundingClientRect();
+    setPfpTooltip({ name, x: e.clientX - rect.left, y: e.clientY - rect.top - 20 });
+  }, []);
+  const handlePfpLeave = useCallback(() => {
+    tooltipTimerRef.current = setTimeout(() => setPfpTooltip(null), 100);
+  }, []);
 
   const visibleBeaconIds = useMemo(() => {
     if (!proofRange) return null;
@@ -278,13 +296,14 @@ export default function BeaconHeatmap({
   const [editValue, setEditValue] = useState("");
   const [editPos, setEditPos] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExpandedView, setIsExpandedView] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   // Separate positions for fullscreen — independent of widget positions
   const [fsPositions, setFsPositions] = useState<Record<string, { x: number; y: number }>>({});
 
   // ── Timeline player state ──
   const [isPlaying, setIsPlaying] = useState(false);
-  const [localPlaybackTime, setLocalPlaybackTime] = useState(eventStartTime || 0);
+  const [localPlaybackTime, setLocalPlaybackTime] = useState(playbackTime ?? eventStartTime ?? 0);
   const [playSpeed, setPlaySpeed] = useState(100);
   const [viewMode, setViewMode] = useState<"lines" | "pfps">("lines");
   const playRafRef = useRef<number>(0);
@@ -299,10 +318,10 @@ export default function BeaconHeatmap({
     if (playbackTime != null && !isPlayingRef.current) setLocalPlaybackTime(playbackTime);
   }, [playbackTime]);
 
-  // Reset local time when event times change
+  // Reset local time when event times change (but not if playbackTime is already set)
   useEffect(() => {
-    if (eventStartTime != null) setLocalPlaybackTime(eventStartTime);
-  }, [eventStartTime]);
+    if (eventStartTime != null && playbackTime == null) setLocalPlaybackTime(eventStartTime);
+  }, [eventStartTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ref to call parent without re-triggering effects
   const onPlaybackTimeRef = useRef(onPlaybackTime);
@@ -683,6 +702,14 @@ export default function BeaconHeatmap({
     };
   }, []);
 
+  // Close expanded view on Escape
+  useEffect(() => {
+    if (!isExpandedView) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setIsExpandedView(false); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [isExpandedView]);
+
   // Track SVG container size for dynamic viewBox (debounced)
   useEffect(() => {
     const el = svgWrapRef.current;
@@ -720,7 +747,7 @@ export default function BeaconHeatmap({
   const orbitingPfps = useMemo(() => {
     if (!isFullscreen || !proofs || !profiles) return {};
     const cutoff = Math.floor(Date.now() / 1000) - 1800;
-    const result: Record<string, { userId: string; freshness: number; profilePicture: string; orbitSpeed: number; startAngle: number }[]> = {};
+    const result: Record<string, { userId: string; displayName: string; freshness: number; profilePicture: string; orbitSpeed: number; startAngle: number }[]> = {};
 
     // First pass: find each user's globally latest proof → assign them to that beacon only
     const userLatestBeacon: Record<string, { beaconId: string; time: number }> = {};
@@ -756,6 +783,7 @@ export default function BeaconHeatmap({
         const freshness = (time - cutoff) / 1800;
         entries.push({
           userId,
+          displayName: profile.displayName || userId.substring(0, 10),
           freshness: Math.max(0, Math.min(1, freshness)),
           profilePicture: profile.profilePicture,
           orbitSpeed: (2 * Math.PI) / (18 + (idx % 5)),
@@ -776,14 +804,14 @@ export default function BeaconHeatmap({
     const RING_COUNT = 4;
 
     type OrbitItem = {
-      userId: string; profilePicture: string;
+      userId: string; displayName: string; profilePicture: string;
       centerX: number; centerY: number;
       orbitRadius: number; period: number; delayS: number;
     };
 
     function assignRings(
       centerX: number, centerY: number, innerR: number, ringGap: number,
-      users: { userId: string; freshness: number; profilePicture: string; orbitSpeed: number; startAngle: number }[],
+      users: { userId: string; displayName: string; freshness: number; profilePicture: string; orbitSpeed: number; startAngle: number }[],
       keyPrefix: string,
     ) {
       const pfpDiam = pr * 2 + 4;
@@ -817,7 +845,7 @@ export default function BeaconHeatmap({
           const baseAngle = (i / Math.max(bucket.length, 1)) * Math.PI * 2;
           const delayS = -(baseAngle / (2 * Math.PI)) * ringPeriod;
           items.push({
-            userId: u.userId, profilePicture: u.profilePicture,
+            userId: u.userId, displayName: u.displayName, profilePicture: u.profilePicture,
             centerX, centerY, orbitRadius: r, period: ringPeriod, delayS,
           });
         }
@@ -923,7 +951,7 @@ export default function BeaconHeatmap({
   function getBeaconName(b: Beacon): string {
     const custom = names[b.id];
     if (custom) return custom;
-    return b.name || b.id.substring(0, 8);
+    return b.id.substring(0, 8);
   }
 
   function truncName(name: string, max: number = 16): string {
@@ -1303,6 +1331,7 @@ export default function BeaconHeatmap({
         {g.items.map((item) => (
           <g key={`o-${g.keyPrefix}-${item.userId}`}
             style={{
+              cursor: "pointer",
               transformOrigin: `${item.centerX}px ${item.centerY}px`,
               animationName: 'orbit',
               animationDuration: `${item.period}s`,
@@ -1310,6 +1339,7 @@ export default function BeaconHeatmap({
               animationIterationCount: 'infinite',
               animationDelay: `${item.delayS}s`,
             }}>
+            <title>{item.displayName}</title>
             <g transform={`translate(${item.centerX + item.orbitRadius},${item.centerY})`}>
               <g style={{
                 transformOrigin: '0px 0px',
@@ -1994,12 +2024,21 @@ export default function BeaconHeatmap({
       {/* ═══ NORMAL VIEW ═══ */}
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
         <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
-          {hasJourney ? "User Journey" : "Beacon Network"}
+          {hasJourney ? "User Journey" : "Event Areas"}
         </span>
-        <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>
-          {beaconList.length} beacon{beaconList.length !== 1 ? "s" : ""}
-          {journeySummary && ` \u00b7 ${journeySummary.beaconIds.size} zones \u00b7 ${journeySummary.edges.reduce((s, e) => s + e.trips, 0)} trips`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>
+            {beaconList.length} beacon{beaconList.length !== 1 ? "s" : ""}
+            {journeySummary && ` \u00b7 ${journeySummary.beaconIds.size} zones \u00b7 ${journeySummary.edges.reduce((s, e) => s + e.trips, 0)} trips`}
+          </span>
+          <button onClick={() => setIsExpandedView(true)} className="skeuo-btn" title="Full screen"
+            style={{ padding: "2px 5px", borderRadius: 4, color: "var(--text-tertiary)", lineHeight: 0 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="7.5,1 11,1 11,4.5" /><line x1="11" y1="1" x2="7" y2="5" />
+              <polyline points="4.5,11 1,11 1,7.5" /><line x1="1" y1="11" x2="5" y2="7" />
+            </svg>
+          </button>
+        </div>
       </div>
       {!hasJourney && (
         <div className="px-3 pb-1.5 flex gap-1">
@@ -2015,6 +2054,243 @@ export default function BeaconHeatmap({
           <button onClick={toggleScreen2} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 2</button>
         </div>
       )}
+      {/* ═══ EXPANDED VIEW MODAL ═══ */}
+      {isExpandedView && createPortal(
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", flexDirection: "column", background: "var(--bg, #0d0d0d)" }}
+          onClick={() => setIsExpandedView(false)}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid var(--border, #222)" }}
+            onClick={e => e.stopPropagation()}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary, #888)" }}>
+              {hasJourney ? "User Journey" : "Event Areas"}
+            </span>
+            <button onClick={() => setIsExpandedView(false)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--border, #333)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", color: "var(--text-secondary, #aaa)", fontSize: 11, fontWeight: 600 }}>
+              Close
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, padding: 16, position: "relative" }} onClick={e => e.stopPropagation()}>
+            <svg viewBox="0 0 400 400" style={{ width: "100%", height: "100%" }} preserveAspectRatio="xMidYMid meet">
+              {staticSvg}
+              {isPlaybackActive && viewMode === "pfps" ? (<>
+                {(() => {
+                  const pfpCounts: Record<string, number> = {};
+                  if (!selectedUserId && movingPfps) {
+                    for (const p of movingPfps) {
+                      if (!p.moving) pfpCounts[p.beaconId] = (pfpCounts[p.beaconId] || 0) + 1;
+                    }
+                  }
+                  return beaconList.map((b) => {
+                    const pos = positions[b.id];
+                    if (!pos) return null;
+                    const count = beaconProofCounts[b.id] || 0;
+                    const maxC = Math.max(1, ...Object.values(beaconProofCounts));
+                    const nodeRadius = 18 + (count / maxC) * 22;
+                    return (
+                      <g key={`epb-${b.id}`}>
+                        <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill="rgba(255,255,255,0.04)"
+                          stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} />
+                        {!selectedUserId && (
+                          <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
+                            fill="white" fontSize={Math.max(10, nodeRadius * 0.5)}
+                            fontWeight="700" style={{ pointerEvents: "none" }}>
+                            {pfpCounts[b.id] || 0}
+                          </text>
+                        )}
+                        <text x={pos.x} y={pos.y + nodeRadius + 8} textAnchor="middle"
+                          fill="rgba(255,255,255,0.5)" fontSize="6" fontWeight="600" style={{ pointerEvents: "none" }}>
+                          {(names[b.id] || b.name || b.id.substring(0, 10)).substring(0, 12)}
+                        </text>
+                      </g>
+                    );
+                  });
+                })()}
+                {movingPfps && movingPfps.map((p) => {
+                  const isSolo = !!selectedUserId;
+                  const beaconPos = isSolo && !p.moving ? positions[p.beaconId] : null;
+                  const cx = beaconPos ? beaconPos.x : p.x;
+                  const cy = beaconPos ? beaconPos.y : p.y;
+                  const count = beaconProofCounts[p.beaconId] || 0;
+                  const maxC = Math.max(1, ...Object.values(beaconProofCounts));
+                  const nodeRadius = 18 + (count / maxC) * 22;
+                  const r = isSolo && !p.moving ? Math.max(8, nodeRadius * 0.55) : 7;
+                  return (
+                    <g key={`empfp-${p.userId}`} style={{ cursor: "pointer" }}
+                      onMouseEnter={(e) => handlePfpEnter(p.name, e)}
+                      onMouseMove={(e) => handlePfpMove(p.name, e)}
+                      onMouseLeave={handlePfpLeave}
+                      onClick={() => { onPlaybackTime?.(localPlaybackTime); setIsExpandedView(false); onClickUser?.(p.userId); }}>
+                      <defs>
+                        <clipPath id={`empfp-clip-${p.userId}`}>
+                          <circle cx={cx} cy={cy} r={r} />
+                        </clipPath>
+                      </defs>
+                      {p.moving && (<>
+                        <circle cx={cx} cy={cy} r={r + 4} fill="rgba(0,149,255,0.08)" />
+                        <circle cx={cx} cy={cy} r={r + 2} fill="none" stroke="#0095FF" strokeWidth={1} opacity={0.6} />
+                      </>)}
+                      <circle cx={cx} cy={cy} r={r + 0.5} fill="rgba(0,0,0,0.6)" />
+                      {p.pic ? (
+                        <foreignObject x={cx - r} y={cy - r} width={r * 2} height={r * 2} style={{ pointerEvents: "none" }}>
+                          <img src={p.pic} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
+                        </foreignObject>
+                      ) : (
+                        <>
+                          <circle cx={cx} cy={cy} r={r} fill="#444" />
+                          <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="central"
+                            fill="white" fontSize="7" fontWeight="700" style={{ pointerEvents: "none" }}>
+                            {(p.name[0] || "?").toUpperCase()}
+                          </text>
+                        </>
+                      )}
+                    </g>
+                  );
+                })}
+              </>) : (<>
+                {interactiveSvg}
+                {animatedPfps}
+              </>)}
+            </svg>
+            {pfpTooltip && (
+              <div style={{
+                position: "absolute", left: pfpTooltip.x, top: pfpTooltip.y,
+                transform: "translate(-50%, -100%)", pointerEvents: "none", zIndex: 50,
+                background: "var(--tooltip-bg, rgba(0,0,0,0.85))", border: "1px solid var(--tooltip-border, #333)",
+                borderRadius: 6, padding: "3px 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+                fontSize: 10, fontWeight: 600, color: "var(--text-primary, #fff)", whiteSpace: "nowrap",
+                fontFamily: "var(--font-space-mono), monospace",
+              }}>
+                {pfpTooltip.name}
+              </div>
+            )}
+          </div>
+          {/* Timeline player in expanded view */}
+          {hasTimeline && (
+            <div
+              className="flex-shrink-0 flex items-center gap-3 px-5"
+              style={{
+                height: 48,
+                background: "var(--inset-bg)",
+                borderTop: "1px solid rgba(0,0,0,0.4)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                onClick={isPlaying ? handlePause : handlePlay}
+                className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: isPlaying
+                    ? "linear-gradient(180deg, #444 0%, #333 100%)"
+                    : "linear-gradient(180deg, #0095FF 0%, #0077CC 100%)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
+                }}
+                title={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
+                    <rect x="1.5" y="1" width="2.5" height="8" rx="0.5" />
+                    <rect x="6" y="1" width="2.5" height="8" rx="0.5" />
+                  </svg>
+                ) : (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
+                    <path d="M2 1L9 5L2 9V1Z" />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={handleStop}
+                className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: "var(--selected-bg)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                }}
+                title="Stop (live)"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="var(--chart-label)">
+                  <rect x="1.5" y="1.5" width="7" height="7" rx="1" />
+                </svg>
+              </button>
+              <div className="flex gap-0 flex-shrink-0 rounded overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                <button
+                  onClick={() => setViewMode("lines")}
+                  className="px-2 py-1 text-[8px] font-bold"
+                  style={{
+                    background: viewMode === "lines" ? "rgba(0,149,255,0.2)" : "transparent",
+                    color: viewMode === "lines" ? "#0095FF" : "var(--text-tertiary)",
+                  }}
+                  title="Lines & numbers"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <line x1="2" y1="2" x2="10" y2="10" /><line x1="2" y1="10" x2="10" y2="2" />
+                    <circle cx="2" cy="2" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" />
+                    <circle cx="2" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="2" r="1.5" fill="currentColor" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode("pfps")}
+                  className="px-2 py-1 text-[8px] font-bold"
+                  style={{
+                    background: viewMode === "pfps" ? "rgba(0,149,255,0.2)" : "transparent",
+                    color: viewMode === "pfps" ? "#0095FF" : "var(--text-tertiary)",
+                  }}
+                  title="PFP avatars"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <circle cx="6" cy="4" r="2.5" /><path d="M2 11c0-2.2 1.8-4 4-4s4 1.8 4 4" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 relative flex items-center" style={{ height: 22 }}>
+                <div className="absolute inset-x-0 rounded-full"
+                  style={{ height: 4, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.4)" }} />
+                <div className="absolute rounded-full"
+                  style={{
+                    height: 4, top: "50%", transform: "translateY(-50%)", left: 0,
+                    width: `${eventEndTime! > eventStartTime! ? ((localPlaybackTime - eventStartTime!) / (eventEndTime! - eventStartTime!)) * 100 : 0}%`,
+                    background: "linear-gradient(90deg, #0095FF, #00C6FF)", boxShadow: "0 0 6px rgba(0,149,255,0.4)",
+                  }} />
+                <input type="range" min={eventStartTime} max={eventEndTime} step={1} value={localPlaybackTime} onChange={handleScrub}
+                  className="timeline-scrubber"
+                  style={{ width: "100%", position: "relative", zIndex: 1, appearance: "none", WebkitAppearance: "none", background: "transparent", height: 22, cursor: "pointer" }} />
+              </div>
+              <span className="text-[10px] font-mono font-bold flex-shrink-0" style={{ color: isPlaybackActive ? "#0095FF" : "var(--text-tertiary)" }}>
+                {new Date(localPlaybackTime * 1000).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit" })}
+              </span>
+              <div className="flex gap-0.5 flex-shrink-0">
+                {[10, 50, 100, 1000, 5000].map((s) => (
+                  <button key={s} onClick={() => setPlaySpeed(s)}
+                    className="px-1.5 py-1 rounded text-[8px] font-bold"
+                    style={{
+                      background: playSpeed === s ? "linear-gradient(180deg, #0095FF 0%, #0077CC 100%)" : "transparent",
+                      color: playSpeed === s ? "#fff" : "var(--text-tertiary)",
+                      border: playSpeed === s ? "1px solid rgba(0,149,255,0.4)" : "1px solid transparent",
+                    }}>
+                    {s >= 1000 ? `${s/1000}k` : s}x
+                  </button>
+                ))}
+              </div>
+              <style>{`
+                .timeline-scrubber::-webkit-slider-thumb {
+                  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+                  background: linear-gradient(180deg, #fff 0%, #ccc 100%); border: 1px solid rgba(0,0,0,0.3);
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: pointer;
+                }
+                .timeline-scrubber::-moz-range-thumb {
+                  width: 12px; height: 12px; border-radius: 50%;
+                  background: linear-gradient(180deg, #fff 0%, #ccc 100%); border: 1px solid rgba(0,0,0,0.3);
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.4); cursor: pointer;
+                }
+                .timeline-scrubber::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+                .timeline-scrubber::-moz-range-track { height: 4px; background: transparent; }
+              `}</style>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
       <div className="flex-1 min-h-0 px-2 pb-2">
         <div className="skeuo-inset h-full p-1 overflow-hidden relative">
           {!isFullscreen && (
@@ -2070,7 +2346,11 @@ export default function BeaconHeatmap({
                   const nodeRadius = 18 + (count / maxC) * 22;
                   const r = isSolo && !p.moving ? Math.max(8, nodeRadius * 0.55) : 7;
                   return (
-                    <g key={`mpfp-${p.userId}`}>
+                    <g key={`mpfp-${p.userId}`} style={{ cursor: "pointer" }}
+                      onMouseEnter={(e) => handlePfpEnter(p.name, e)}
+                      onMouseMove={(e) => handlePfpMove(p.name, e)}
+                      onMouseLeave={handlePfpLeave}
+                      onClick={() => { onPlaybackTime?.(localPlaybackTime); setIsExpandedView(false); onClickUser?.(p.userId); }}>
                       <defs>
                         <clipPath id={`mpfp-clip-${p.userId}`}>
                           <circle cx={cx} cy={cy} r={r} />
@@ -2104,6 +2384,18 @@ export default function BeaconHeatmap({
                 {animatedPfps}
               </>)}
             </svg>
+          )}
+          {pfpTooltip && (
+            <div style={{
+              position: "absolute", left: pfpTooltip.x, top: pfpTooltip.y,
+              transform: "translate(-50%, -100%)", pointerEvents: "none", zIndex: 50,
+              background: "var(--tooltip-bg, rgba(0,0,0,0.85))", border: "1px solid var(--tooltip-border, #333)",
+              borderRadius: 6, padding: "3px 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+              fontSize: 10, fontWeight: 600, color: "var(--text-primary, #fff)", whiteSpace: "nowrap",
+              fontFamily: "var(--font-space-mono), monospace",
+            }}>
+              {pfpTooltip.name}
+            </div>
           )}
         </div>
       </div>

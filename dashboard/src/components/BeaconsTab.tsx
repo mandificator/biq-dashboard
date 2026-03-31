@@ -60,7 +60,7 @@ function formatTs(ts: number): string {
 
 function getBeaconDisplayName(b: Beacon, names: Record<string, string>): string {
   if (names[b.id]) return names[b.id];
-  return b.name || b.id.substring(0, 10);
+  return b.id.substring(0, 10);
 }
 
 interface BeaconCluster {

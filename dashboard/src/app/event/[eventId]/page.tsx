@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { AnalyticsResponse, ProcessedData, Beacon } from "@/types";
+import { AnalyticsResponse, ProcessedData, Beacon, LumaGuest } from "@/types";
 import { processAnalytics, mergeAnalytics } from "@/lib/processData";
 import StatsCards from "@/components/StatsCards";
 import BeaconHeatmap from "@/components/BeaconHeatmap";
@@ -32,9 +32,9 @@ function formatDurCSV(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-function exportCSV(data: ProcessedData) {
+function exportCSV(data: ProcessedData, customBeaconNames: Record<string, string> = {}) {
   const beaconIds = Object.keys(data.beacons);
-  const beaconNames = beaconIds.map((id) => data.beacons[id]?.name || id.substring(0, 10));
+  const beaconNames = beaconIds.map((id) => customBeaconNames[id] || id.substring(0, 10));
 
   const userBeaconCounts: Record<string, Record<string, number>> = {};
   for (const proof of data.proofs) {
@@ -69,6 +69,43 @@ function exportCSV(data: ProcessedData) {
   a.download = `${data.event.name || "export"}_users.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function parseLumaCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) { result.push(current); current = ""; }
+    else current += ch;
+  }
+  result.push(current);
+  return result;
+}
+
+function parseLumaCSV(text: string): LumaGuest[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const headers = parseLumaCSVLine(lines[0]).map((h) => h.trim());
+  const guests: LumaGuest[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseLumaCSVLine(lines[i]);
+    const row: Record<string, string> = {};
+    headers.forEach((h, idx) => { row[h] = (values[idx] || "").trim(); });
+    if (row.solana_address) {
+      guests.push({
+        api_id: row.api_id || "",
+        name: row.name || "",
+        email: row.email || "",
+        solana_address: row.solana_address,
+      });
+    }
+  }
+  return guests;
 }
 
 function initCirclePositions(beacons: Record<string, Beacon>): Record<string, { x: number; y: number }> {
@@ -117,6 +154,40 @@ export default function EventPage() {
   const [filteredBeaconIds, setFilteredBeaconIds] = useState<string[] | null>(null);
   const [playbackTime, setPlaybackTime] = useState<number | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
+
+  // Luma check-in: wallet → guest mapping
+  const [lumaGuests, setLumaGuests] = useState<Record<string, LumaGuest>>({});
+  const [lumaTotal, setLumaTotal] = useState(0);
+
+  // Load Luma guests from localStorage
+  useEffect(() => {
+    if (!eventId) return;
+    const saved = loadFromStorage<{ guests: Record<string, LumaGuest>; total: number }>(`luma-guests-${eventId}`, { guests: {}, total: 0 });
+    if (saved.total > 0) {
+      setLumaGuests(saved.guests);
+      setLumaTotal(saved.total);
+    }
+  }, [eventId]);
+
+  const handleLumaCSV = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      if (!text) return;
+      const guests = parseLumaCSV(text);
+      const map: Record<string, LumaGuest> = {};
+      for (const g of guests) {
+        map[g.solana_address.toLowerCase()] = g;
+      }
+      setLumaGuests(map);
+      setLumaTotal(guests.length);
+      if (eventId) saveToStorage(`luma-guests-${eventId}`, { guests: map, total: guests.length });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }, [eventId]);
 
   const selectedUserJourney = useMemo(() => {
     if (!selectedUserId || !processed) return undefined;
@@ -383,8 +454,19 @@ export default function EventPage() {
                   </svg>
                 </button>
               </div>
+              <label
+                className="skeuo-btn px-3 py-1.5 text-[11px] font-bold cursor-pointer"
+                style={{ color: "#a855f7", borderColor: "#a855f744" }}
+                title="Upload Luma guest CSV for automatic check-in"
+              >
+                {lumaTotal > 0 ? `Lu.ma ${(() => {
+                  const matched = processed.userDetails.filter(u => lumaGuests[u.userId.toLowerCase()]).length;
+                  return `${matched}/${lumaTotal}`;
+                })()}` : "Lu.ma CSV"}
+                <input type="file" accept=".csv" onChange={handleLumaCSV} className="hidden" />
+              </label>
               <button
-                onClick={() => exportCSV(processed)}
+                onClick={() => exportCSV(processed, beaconNames)}
                 className="skeuo-btn px-3 py-1.5 text-[11px] font-bold mr-8"
                 style={{ color: "#8CC63F", borderColor: "#8CC63F44" }}
               >
@@ -448,11 +530,12 @@ export default function EventPage() {
                           eventEndTime={processed.event.endTime}
                           dwellTimes={processed.dwellTimes}
                           profiles={processed.profiles}
+                          lumaGuests={lumaTotal > 0 ? lumaGuests : undefined}
                         />
                       </div>
                       <div className="flex-1 min-w-0 min-h-0 h-full overflow-hidden">
                         {selectedUser ? (
-                          <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} onTimeClick={setPlaybackTime} />
+                          <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} onTimeClick={setPlaybackTime} lumaGuest={lumaGuests[selectedUser.userId.toLowerCase()]} />
                         ) : (
                           <div className="skeuo-panel h-full flex items-center justify-center">
                             <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
@@ -491,6 +574,7 @@ export default function EventPage() {
                       eventEndTime={processed.event.endTime}
                       onPlaybackTime={setPlaybackTime}
                       playbackTime={playbackTime}
+                      onClickUser={handleChartClickUser}
                     />
                   </div>
                 )}
@@ -510,6 +594,7 @@ export default function EventPage() {
                       eventEndTime={processed.event.endTime}
                       onPlaybackTime={setPlaybackTime}
                       playbackTime={playbackTime}
+                      onClickUser={handleChartClickUser}
                     />
                   </div>
                 )}

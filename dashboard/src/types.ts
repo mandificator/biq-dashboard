@@ -26,6 +26,13 @@ export interface EventData {
   updatedAt: number;
 }
 
+export interface LumaGuest {
+  api_id: string;
+  name: string;
+  email: string;
+  solana_address: string;
+}
+
 export interface Proof {
   id: string;
   clientId: string;

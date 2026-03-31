@@ -91,12 +91,12 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
       <Link
         href={`/event/${event.id}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex items-center justify-center gap-1.5 py-1.5 text-[9px] font-bold transition-all"
+        className="flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold transition-all hover:brightness-110"
         title="Open in Dashboard"
         style={{
-          background: "transparent",
-          color: "var(--text-tertiary)",
-          borderTop: "1px solid var(--overlay-border)",
+          background: "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)",
+          color: "#8CC63F",
+          borderTop: "1px solid #8CC63F33",
         }}
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

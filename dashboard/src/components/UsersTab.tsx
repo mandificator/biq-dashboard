@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { UserDetail, Beacon, Profile } from "@/types";
+import { UserDetail, Beacon, Profile, LumaGuest } from "@/types";
 import { useState, useMemo } from "react";
 import { DwellTimeChart } from "./Charts";
 
@@ -52,13 +52,14 @@ function formatTime(ts: number): string {
 
 function getBeaconDisplayName(bid: string, beacons: Record<string, Beacon>, names: Record<string, string>): string {
   if (names[bid]) return names[bid];
-  return beacons[bid]?.name || bid.substring(0, 10);
+  return bid.substring(0, 10);
 }
 
-function UserRow({ user, isSelected, onSelect }: {
+function UserRow({ user, isSelected, onSelect, lumaGuest }: {
   user: UserDetail;
   isSelected: boolean;
   onSelect: () => void;
+  lumaGuest?: LumaGuest;
 }) {
   return (
     <button
@@ -78,8 +79,17 @@ function UserRow({ user, isSelected, onSelect }: {
         size={20}
       />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
+        <div className="text-[10px] font-bold truncate flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
           {user.profile?.displayName || user.userId.substring(0, 10) + "..."}
+          {lumaGuest && (
+            <span
+              className="text-[7px] font-bold px-1 py-0 rounded"
+              style={{ background: "#a855f722", color: "#a855f7", border: "1px solid #a855f733" }}
+              title={`Luma: ${lumaGuest.name} (${lumaGuest.email})`}
+            >
+              LU.MA
+            </span>
+          )}
         </div>
         <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
           {formatTime(user.firstProof)}
@@ -131,11 +141,12 @@ function UserColumn({ title, count, color, icon, users, selectedUserId, onSelect
 }
 
 // ── Exported: User Detail Panel (used in page.tsx above beacon map) ──
-export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick }: {
+export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaGuest }: {
   user: UserDetail;
   beacons: Record<string, Beacon>;
   beaconNames: Record<string, string>;
   onTimeClick?: (time: number) => void;
+  lumaGuest?: LumaGuest;
 }) {
   return (
     <div className="skeuo-panel min-w-0 flex flex-col overflow-hidden h-full">
@@ -157,18 +168,33 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick }: {
             {user.userId}
           </div>
         </div>
-        <span
-          className="px-2 py-0.5 rounded-md text-[8px] font-bold"
-          style={{
-            background: user.status === "present"
-              ? "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)"
-              : "linear-gradient(180deg, #F7941D22 0%, #F7941D11 100%)",
-            color: user.status === "present" ? "#8CC63F" : "#F7941D",
-            border: `1px solid ${user.status === "present" ? "#8CC63F33" : "#F7941D33"}`,
-          }}
-        >
-          {user.status === "present" ? "Present" : "Left"}
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {lumaGuest && (
+            <span
+              className="px-2 py-0.5 rounded-md text-[8px] font-bold"
+              style={{
+                background: "linear-gradient(180deg, #a855f722 0%, #a855f711 100%)",
+                color: "#a855f7",
+                border: "1px solid #a855f733",
+              }}
+              title={`Luma: ${lumaGuest.name} (${lumaGuest.email})`}
+            >
+              LU.MA
+            </span>
+          )}
+          <span
+            className="px-2 py-0.5 rounded-md text-[8px] font-bold"
+            style={{
+              background: user.status === "present"
+                ? "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)"
+                : "linear-gradient(180deg, #F7941D22 0%, #F7941D11 100%)",
+              color: user.status === "present" ? "#8CC63F" : "#F7941D",
+              border: `1px solid ${user.status === "present" ? "#8CC63F33" : "#F7941D33"}`,
+            }}
+          >
+            {user.status === "present" ? "Present" : "Left"}
+          </span>
+        </div>
       </div>
 
       {/* Stats */}
@@ -234,7 +260,7 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick }: {
   );
 }
 
-type Filter = "all" | "present" | "left";
+type Filter = "all" | "present" | "left" | "luma";
 
 // ── Main UsersTab: single list with filter tabs ──
 interface Props {
@@ -247,28 +273,37 @@ interface Props {
   eventEndTime: number;
   dwellTimes: { userId: string; minutes: number }[];
   profiles: Record<string, Profile>;
+  lumaGuests?: Record<string, LumaGuest>;
 }
 
-export default React.memo(function UsersTab({ users, selectedUserId, onSelectUser }: Props) {
+export default React.memo(function UsersTab({ users, selectedUserId, onSelectUser, lumaGuests }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
 
-  const { all, presentCount, leftCount } = useMemo(() => {
+  const { all, presentCount, leftCount, lumaCount } = useMemo(() => {
     const all = [...users].sort((a, b) => a.firstProof - b.firstProof);
     const presentCount = users.filter(u => u.status === "present").length;
     const leftCount = users.filter(u => u.status === "left").length;
-    return { all, presentCount, leftCount };
-  }, [users]);
+    const lumaCount = lumaGuests
+      ? users.filter(u => lumaGuests[u.userId.toLowerCase()]).length
+      : 0;
+    return { all, presentCount, leftCount, lumaCount };
+  }, [users, lumaGuests]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return all;
+    if (filter === "luma") return lumaGuests ? all.filter(u => lumaGuests[u.userId.toLowerCase()]) : [];
     return all.filter(u => u.status === filter);
-  }, [all, filter]);
+  }, [all, filter, lumaGuests]);
 
   const tabs: { key: Filter; label: string; count: number; color: string }[] = [
     { key: "all", label: "All", count: all.length, color: "#0095FF" },
     { key: "present", label: "Present", count: presentCount, color: "#8CC63F" },
     { key: "left", label: "Left", count: leftCount, color: "#F7941D" },
   ];
+
+  if (lumaGuests && Object.keys(lumaGuests).length > 0) {
+    tabs.push({ key: "luma", label: "Lu.ma", count: lumaCount, color: "#a855f7" });
+  }
 
   return (
     <div className="skeuo-panel flex-1 min-w-0 flex flex-col overflow-hidden h-full">
@@ -289,6 +324,26 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
           </button>
         ))}
       </div>
+      {/* Luma check-in progress */}
+      {lumaGuests && Object.keys(lumaGuests).length > 0 && (
+        <div
+          className="px-2 py-1.5 flex items-center gap-2"
+          style={{ borderBottom: "1px solid rgba(0,0,0,0.2)" }}
+        >
+          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.3)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${(lumaCount / Object.keys(lumaGuests).length) * 100}%`,
+                background: "linear-gradient(90deg, #a855f7, #7c3aed)",
+              }}
+            />
+          </div>
+          <span className="text-[8px] font-bold" style={{ color: "#a855f7" }}>
+            {lumaCount}/{Object.keys(lumaGuests).length}
+          </span>
+        </div>
+      )}
       {/* User list */}
       <div className="flex-1 overflow-y-auto m-1.5 skeuo-inset">
         <div className="p-1 space-y-0.5">
@@ -301,6 +356,7 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
                 user={u}
                 isSelected={selectedUserId === u.userId}
                 onSelect={() => onSelectUser(selectedUserId === u.userId ? null : u.userId)}
+                lumaGuest={lumaGuests?.[u.userId.toLowerCase()]}
               />
             ))
           )}
