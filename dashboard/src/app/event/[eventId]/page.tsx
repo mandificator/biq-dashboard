@@ -11,8 +11,9 @@ import BeaconsTab from "@/components/BeaconsTab";
 
 function PanelSpinner() {
   return (
-    <div className="skeuo-panel h-full flex items-center justify-center">
-      <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+    <div className="skeuo-panel h-full flex flex-col p-4 gap-3">
+      <div className="skeleton" style={{ width: 120, height: 12 }} />
+      <div className="skeleton flex-1" />
     </div>
   );
 }
@@ -525,26 +526,26 @@ export default function EventPage() {
               peakConcurrent={processed.peakConcurrent}
             />
 
-            <div className="flex gap-3 flex-1 min-h-0">
-              <div className="flex-1 min-w-0 flex flex-col gap-3 min-h-0">
+            <div className="flex gap-3 flex-1 min-h-0" key={activeTab}>
+              <div className="flex-1 min-w-0 flex flex-col gap-3 min-h-0 anim-in">
                 {activeTab === "overview" && (
                   <>
-                    <div className="min-h-0" style={{ flex: 1.25 }}>
+                    <div className="min-h-0 anim-in" style={{ flex: 1.25, animationDelay: "120ms" }}>
                       <PresenceChart data={processed.presenceTimeline} peak={processed.peakConcurrent} />
                     </div>
                     <div className="flex-1 min-h-0 flex gap-3">
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 anim-in" style={{ animationDelay: "200ms" }}>
                         <CheckInChart data={processed.checkInTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 anim-in" style={{ animationDelay: "260ms" }}>
                         <CheckOutChart data={processed.checkOutTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
                       </div>
                     </div>
                     <div className="flex-1 min-h-0 flex gap-3">
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 anim-in" style={{ animationDelay: "320ms" }}>
                         <DwellHistogram data={processed.dwellTimes} />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 anim-in" style={{ animationDelay: "380ms" }}>
                         <RetentionChart data={processed.dwellTimes} />
                       </div>
                     </div>

@@ -1187,7 +1187,7 @@ export default function BeaconHeatmap({
         };
 
         return (
-          <g filter="url(#heat-ramp)" style={{ pointerEvents: "none" }}>
+          <g filter="url(#heat-ramp)" style={{ pointerEvents: "none", animation: "heat-breathe 5s ease-in-out infinite" }}>
             {/* Corridors between zones — crowd flow (default mode) */}
             {!selectedUserId && !hasJourney && transitions.map((t, i) => {
               const fromPos = getPos(t.from);
@@ -1228,6 +1228,29 @@ export default function BeaconHeatmap({
                   fill="url(#heat-blob)" opacity={0.22 + intensity * 0.78} />
               );
             })}
+          </g>
+        );
+      })()}
+
+      {/* Radar ping on the hottest zone — live-dashboard heartbeat */}
+      {!isFullscreen && !selectedUserId && !hasJourney && maxCount > 0 && (() => {
+        let hotId: string | null = null;
+        let hotCount = 0;
+        for (const b of beaconList) {
+          if (visibleBeaconIds && !visibleBeaconIds.has(b.id)) continue;
+          if (filteredBeaconIds && !filteredBeaconIds.includes(b.id)) continue;
+          const c = beaconProofCounts[b.id] || 0;
+          if (c > hotCount) { hotCount = c; hotId = b.id; }
+        }
+        if (!hotId) return null;
+        const pos = getPos(hotId);
+        if (!pos) return null;
+        return (
+          <g style={{ pointerEvents: "none" }}>
+            <circle className="radar-ping" cx={pos.x} cy={pos.y} r={24}
+              fill="none" stroke="var(--accent)" strokeWidth={1.2} />
+            <circle className="radar-ping" cx={pos.x} cy={pos.y} r={24}
+              fill="none" stroke="var(--accent)" strokeWidth={1.2} style={{ animationDelay: "1.6s" }} />
           </g>
         );
       })()}

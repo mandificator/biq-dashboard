@@ -10,6 +10,7 @@ import {
 } from "@/types";
 import { analyzeCrossEvents } from "@/lib/crossEventAnalysis";
 import EventCard from "@/components/organizer/EventCard";
+import CountUp from "@/components/CountUp";
 import LiveDashboard from "@/components/organizer/LiveDashboard";
 
 import { EVENT_COLORS } from "@/lib/theme";
@@ -265,9 +266,9 @@ export default function OrganizerDashboard() {
             {/* Event list */}
             <div className="flex-1 min-h-0 overflow-auto px-1.5 py-1">
               <div className="flex flex-col gap-0.5">
-                {orgEvents.map((ev) => (
+                {orgEvents.map((ev, i) => (
+                  <div key={ev.id} className="anim-in" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
                   <EventCard
-                    key={ev.id}
                     event={ev}
                     selected={selectedEventIds.has(ev.id)}
                     onToggle={toggleEvent}
@@ -275,6 +276,7 @@ export default function OrganizerDashboard() {
                     loading={loadingEventIds.has(ev.id)}
                     color={eventColorMap[ev.id] || "#666"}
                   />
+                  </div>
                 ))}
               </div>
             </div>
@@ -329,7 +331,9 @@ function HeaderStat({ label, value }: { label: string; value: string | number })
   return (
     <div className="flex items-baseline gap-1.5">
       <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>{label}</span>
-      <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{value}</span>
+      <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+        {typeof value === "number" ? <CountUp value={value} /> : value}
+      </span>
     </div>
   );
 }

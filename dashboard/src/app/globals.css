@@ -251,3 +251,75 @@ html, body {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Motion — subtle, purposeful, real-time feel
+   ════════════════════════════════════════════════════════════════ */
+
+/* Entrance: fade + slide up. Stagger with inline animation-delay. */
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-in {
+  animation: fade-slide-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Live indicator pulse */
+@keyframes led-pulse {
+  0%, 100% { box-shadow: 0 0 4px currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 12px currentColor; opacity: 0.65; }
+}
+.led-pulse {
+  animation: led-pulse 2.2s ease-in-out infinite;
+}
+
+/* Radar ping — expanding ring on the hottest zone */
+@keyframes radar-ping {
+  0% { transform: scale(0.35); opacity: 0.55; }
+  75% { opacity: 0; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.radar-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: radar-ping 3.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Heat layer breathing — one composite, cheap */
+@keyframes heat-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.88; }
+}
+
+/* Skeleton shimmer for loading panels */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--overlay-subtle) 25%,
+    var(--overlay-divider) 50%,
+    var(--overlay-subtle) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 8px;
+}
+
+/* Interactive card lift */
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  border-color: var(--border-highlight);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-in, .led-pulse, .radar-ping, .skeleton, .card-hover {
+    animation: none !important;
+    transition: none !important;
+  }
+}

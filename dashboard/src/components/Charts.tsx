@@ -273,7 +273,7 @@ export const PresenceChart = React.memo(function PresenceChart({
           );
         }} />
         <Area type="monotone" dataKey="value" name="Present" stroke="#0095FF" fill={`url(#${fs ? "prGradFs" : "prGrad"})`} strokeWidth={2}
-          dot={false} isAnimationActive={false} />
+          dot={false} isAnimationActive animationDuration={900} animationEasing="ease-out" />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -340,7 +340,7 @@ export const DwellHistogram = React.memo(function DwellHistogram({
             </div>
           );
         }} />
-        <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+        <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out">
           {chartData.map((_, i) => (
             <Cell key={i} fill="#0095FF" fillOpacity={i === maxIdx ? 0.95 : 0.5} />
           ))}
@@ -415,7 +415,7 @@ export const RetentionChart = React.memo(function RetentionChart({
           );
         }} />
         <Area type="stepAfter" dataKey="pct" name="Retention" stroke="#0095FF" fill={`url(#${fs ? "rtGradFs" : "rtGrad"})`} strokeWidth={2}
-          dot={false} isAnimationActive={false} />
+          dot={false} isAnimationActive animationDuration={900} animationEasing="ease-out" />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -498,7 +498,7 @@ export const CheckInChart = React.memo(function CheckInChart({
             return <circle key={props.key} cx={props.cx} cy={props.cy} r={fs ? 8 : 6} fill="#0095FF" stroke="#fff" strokeWidth={2} cursor="pointer"
               onClick={(e) => { e.stopPropagation(); if (!fs) handleDotClick(props); }} />;
           }) as any}
-          isAnimationActive={false} />
+          isAnimationActive animationDuration={900} animationEasing="ease-out" />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -575,7 +575,7 @@ export const CheckOutChart = React.memo(function CheckOutChart({
             return <circle key={props.key} cx={props.cx} cy={props.cy} r={fs ? 8 : 6} fill="#67BDFF" stroke="#fff" strokeWidth={2} cursor="pointer"
               onClick={(e) => { e.stopPropagation(); if (!fs) handleDotClick(props); }} />;
           }) as any}
-          isAnimationActive={false} />
+          isAnimationActive animationDuration={900} animationEasing="ease-out" />
       </AreaChart>
     </ResponsiveContainer>
   );

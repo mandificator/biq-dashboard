@@ -55,7 +55,7 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
             </div>
           )}
           {isLive && (
-            <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full skeuo-led" style={{ background: "var(--green)", color: "var(--green)" }} />
+            <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full skeuo-led led-pulse" style={{ background: "var(--green)", color: "var(--green)" }} />
           )}
         </div>
 

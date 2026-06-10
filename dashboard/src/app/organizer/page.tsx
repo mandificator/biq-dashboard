@@ -159,12 +159,12 @@ export default function OrganizerIndex() {
       {!loading && !error && orgList.length > 0 && (
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", maxWidth: 720, width: "100%" }}>
-            {orgList.map((org) => (
+            {orgList.map((org, i) => (
               <button
                 key={org.id}
                 onClick={() => router.push(`/organizer/${org.id}`)}
-                className="skeuo-panel p-4 flex items-center gap-3 text-left transition-all hover:scale-[1.02]"
-                style={{ cursor: "pointer" }}
+                className="skeuo-panel card-hover p-4 flex items-center gap-3 text-left anim-in"
+                style={{ cursor: "pointer", animationDelay: `${i * 60}ms` }}
               >
                 {org.logo ? (
                   <img src={org.logo} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0"

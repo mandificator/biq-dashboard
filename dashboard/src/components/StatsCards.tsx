@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import CountUp from "./CountUp";
 
 interface Props {
   totalAttendees: number;
@@ -80,18 +81,19 @@ export default React.memo(function StatsCards({
   avgDwellMinutes,
   peakConcurrent,
 }: Props) {
-  const values: Record<string, string> = {
-    attended: String(totalAttendees),
-    present: String(currentlyPresent),
-    left: String(alreadyLeft),
-    dwell: formatDur(avgDwellMinutes),
-    peak: String(peakConcurrent),
+  const values: Record<string, React.ReactNode> = {
+    attended: <CountUp value={totalAttendees} />,
+    present: <CountUp value={currentlyPresent} />,
+    left: <CountUp value={alreadyLeft} />,
+    dwell: <CountUp value={avgDwellMinutes} format={formatDur} />,
+    peak: <CountUp value={peakConcurrent} />,
   };
 
   return (
     <div className="flex gap-3">
-      {cards.map((c) => (
-        <div key={c.key} className="skeuo-panel flex-1 px-4 py-2.5 flex items-center justify-between">
+      {cards.map((c, i) => (
+        <div key={c.key} className="skeuo-panel flex-1 px-4 py-2.5 flex items-center justify-between anim-in"
+          style={{ animationDelay: `${i * 60}ms` }}>
           <div>
             <div className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>
               {c.label}
@@ -100,9 +102,9 @@ export default React.memo(function StatsCards({
               {values[c.key]}
             </div>
           </div>
-          {/* Icon badge — accent tint, consistent across all cards */}
+          {/* Icon badge — accent tint; Present pulses while people are on site */}
           <div
-            className="w-8 h-8 flex items-center justify-center"
+            className={`w-8 h-8 flex items-center justify-center${c.key === "present" && currentlyPresent > 0 ? " led-pulse" : ""}`}
             style={{ color: "var(--accent)", background: "var(--accent-dim)", borderRadius: "50%" }}
           >
             {c.icon}

@@ -102,7 +102,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
   return (
     <div className="h-full flex flex-col gap-3 overflow-hidden">
       {/* ── Hero: attendance flow comparison ── */}
-      <div className="skeuo-panel p-3 flex flex-col flex-shrink-0" style={{ height: "34%", minHeight: 180 }}>
+      <div className="skeuo-panel p-3 flex flex-col flex-shrink-0 anim-in" style={{ height: "34%", minHeight: 180 }}>
         <div className="text-[12px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
           Attendance Flow <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>— concurrent attendees, aligned to event start</span>
         </div>
@@ -123,7 +123,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
             { key: "dwell" as const, label: "Avg Dwell", max: barMetrics.maxDwell, fmt: (v: number) => formatDur(v) },
             { key: "peak" as const, label: "Peak Concurrent", max: barMetrics.maxPeak, fmt: (v: number) => String(v) },
           ]).map((metric) => (
-            <div key={metric.key} className="skeuo-panel p-3 flex flex-col flex-1 min-h-0">
+            <div key={metric.key} className="skeuo-panel p-3 flex flex-col flex-1 min-h-0 anim-in" style={{ animationDelay: "120ms" }}>
               <div className="text-[12px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
                 {metric.label}
               </div>
@@ -151,7 +151,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
         </div>
 
         {/* Right: Users list */}
-        <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0 min-h-0">
+        <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0 min-h-0 anim-in" style={{ animationDelay: "200ms" }}>
           <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
             <span className="text-[12px] font-medium flex-1" style={{ color: "var(--text-tertiary)" }}>
               Users ({filteredUsers.length})
@@ -220,7 +220,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
       </div>
 
       {/* ── Bottom center: User Overlap ── */}
-      <div className="skeuo-panel p-3 flex flex-col flex-shrink-0">
+      <div className="skeuo-panel p-3 flex flex-col flex-shrink-0 anim-in" style={{ animationDelay: "280ms" }}>
         <div className="text-[12px] font-medium mb-1" style={{ color: "var(--text-tertiary)" }}>
           User Overlap
         </div>

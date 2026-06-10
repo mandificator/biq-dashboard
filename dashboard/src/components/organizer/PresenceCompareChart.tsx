@@ -99,7 +99,7 @@ export default function PresenceCompareChart({ curves, colors }: Props) {
             strokeWidth={2}
             dot={false}
             connectNulls
-            isAnimationActive={false}
+            isAnimationActive animationDuration={900} animationEasing="ease-out"
           />
         ))}
       </LineChart>
