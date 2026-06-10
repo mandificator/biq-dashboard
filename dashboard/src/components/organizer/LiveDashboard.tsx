@@ -4,8 +4,8 @@ import React, { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { CrossEventAnalysis, EventSummary } from "@/types";
 
-// Recharts is heavy — load the comparison chart only when this view renders.
-const PresenceCompareChart = dynamic(() => import("./PresenceCompareChart"), {
+// Recharts is heavy — load the chart only when this view renders.
+const AudienceGrowthChart = dynamic(() => import("./AudienceGrowthChart"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full">
@@ -103,14 +103,11 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
     <div className="h-full flex flex-col gap-3 overflow-hidden">
       {/* ── Hero: attendance flow comparison ── */}
       <div className="skeuo-panel p-3 flex flex-col flex-shrink-0 anim-in" style={{ height: "34%", minHeight: 180 }}>
-        <div className="text-[12px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
-          Attendance Flow <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>— concurrent attendees, aligned to event start</span>
+        <div className="text-[12px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
+          Audience growth <span style={{ fontWeight: 400, opacity: 0.7, color: "var(--text-tertiary)" }}>— new vs returning attendees per event, in chronological order</span>
         </div>
         <div className="flex-1 min-h-0">
-          <PresenceCompareChart
-            curves={analysis.presenceCurves}
-            colors={Object.fromEntries(sortedMetrics.map((em) => [em.eventId, COLORS[em.origIndex % COLORS.length]]))}
-          />
+          <AudienceGrowthChart growth={analysis.growth} />
         </div>
       </div>
 

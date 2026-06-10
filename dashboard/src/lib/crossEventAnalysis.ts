@@ -41,15 +41,27 @@ export function analyzeCrossEvents(
     peakConcurrent: data.peakConcurrent,
   }));
 
-  // Presence curves aligned to minutes-from-event-start so different
-  // events can be overlaid and compared shape-to-shape.
-  const presenceCurves = datasets.map(({ eventId, data }) => {
-    const start = data.event.startTime;
-    const points = data.presenceTimeline.map((b) => ({
-      minute: Math.round((b.time - start) / 60),
-      count: b.count,
-    }));
-    return { eventId, eventName: data.event.name, points };
+  // Audience growth: for each event in chronological order, how many
+  // attendees were new vs returning (seen at an earlier selected event),
+  // plus the cumulative unique audience. Duration-agnostic, so events of
+  // different scope and length stay comparable.
+  const ordered = [...datasets].sort((a, b) => a.data.event.startTime - b.data.event.startTime);
+  const seen = new Set<string>();
+  const growth = ordered.map(({ eventId, data }) => {
+    let newUsers = 0, returningUsers = 0;
+    for (const u of data.users) {
+      if (seen.has(u.userId)) returningUsers++;
+      else newUsers++;
+    }
+    for (const u of data.users) seen.add(u.userId);
+    return {
+      eventId,
+      eventName: data.event.name,
+      startTime: data.event.startTime,
+      newUsers,
+      returningUsers,
+      cumulativeUnique: seen.size,
+    };
   });
 
   // Overlap matrix: for each pair of events, count shared users
@@ -70,5 +82,5 @@ export function analyzeCrossEvents(
     }
   }
 
-  return { sharedUsers, eventMetrics, presenceCurves, overlapMatrix };
+  return { sharedUsers, eventMetrics, growth, overlapMatrix };
 }

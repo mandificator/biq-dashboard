@@ -158,11 +158,14 @@ export interface OrganizerInfo {
 }
 
 export interface CrossEventAnalysis {
-  presenceCurves: {
+  /** Per-event audience growth, in chronological order. */
+  growth: {
     eventId: string;
     eventName: string;
-    /** Concurrent attendee count sampled at minutes-from-event-start. */
-    points: { minute: number; count: number }[];
+    startTime: number;
+    newUsers: number;
+    returningUsers: number;
+    cumulativeUnique: number;
   }[];
   sharedUsers: {
     userId: string;
