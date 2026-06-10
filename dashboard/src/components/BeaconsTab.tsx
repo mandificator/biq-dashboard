@@ -126,19 +126,19 @@ function clusterBeacons(
 
   const clusters: BeaconCluster[] = [];
   if (highTraffic.size > 0) clusters.push({
-    id: "high", label: "High Traffic", color: "#F7941D",
+    id: "high", label: "High Traffic", color: "#FFB020",
     description: "Top 25% by proof count", beaconIds: highTraffic,
   });
   if (hub.size > 0) clusters.push({
-    id: "hub", label: "Hub", color: "#8CC63F",
+    id: "hub", label: "Hub", color: "#2BD9A9",
     description: "3+ transitions to/from other beacons", beaconIds: hub,
   });
   if (entryPoint.size > 0) clusters.push({
-    id: "entry", label: "Entry Point", color: "#00D4F5",
+    id: "entry", label: "Entry Point", color: "#0095FF",
     description: "Many users' first beacon", beaconIds: entryPoint,
   });
   if (lowActivity.size > 0) clusters.push({
-    id: "low", label: "Low Activity", color: "#8CC63F",
+    id: "low", label: "Low Activity", color: "#2BD9A9",
     description: "Bottom 25% by proof count", beaconIds: lowActivity,
   });
 
@@ -539,10 +539,10 @@ export default React.memo(function BeaconsTab({
                       <span className="truncate">{getBeaconDisplayName(b, beaconNames)}</span>
                       {presentCount > 0 && (
                         <span
-                          className="flex-shrink-0 px-1 py-0 rounded text-[7px] font-bold"
+                          className="flex-shrink-0 px-1 py-0 rounded text-[9px] font-bold"
                           style={{
                             background: "rgba(76, 175, 80, 0.2)",
-                            color: "#4CAF50",
+                            color: "#2BD9A9",
                             border: "1px solid rgba(76, 175, 80, 0.3)",
                             lineHeight: "14px",
                           }}
@@ -634,7 +634,7 @@ export default React.memo(function BeaconsTab({
                     : "—" },
                 ].map((s) => (
                   <div key={s.label} className="skeuo-inset px-2 py-1.5 rounded-md">
-                    <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
+                    <div className="text-[9px] font-medium" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
                     <div className="text-[10px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
                   </div>
                 ))}
@@ -646,7 +646,7 @@ export default React.memo(function BeaconsTab({
                   className="px-3 py-2 flex-shrink-0"
                   style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
                 >
-                  <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
+                  <div className="text-[9px] font-medium mb-1.5" style={{ color: "var(--text-tertiary)" }}>
                     Activity
                   </div>
                   <div className="skeuo-inset rounded-md overflow-hidden" style={{ height: 280 }}>
@@ -689,13 +689,13 @@ export default React.memo(function BeaconsTab({
                   className="px-3 py-2 flex-shrink-0"
                   style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
                 >
-                  <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
+                  <div className="text-[9px] font-medium mb-1.5" style={{ color: "var(--text-tertiary)" }}>
                     Flow
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {/* Incoming */}
                     <div className="skeuo-inset rounded-md p-1.5">
-                      <div className="text-[7px] font-bold uppercase tracking-wider mb-1" style={{ color: "#4CAF50" }}>
+                      <div className="text-[9px] font-medium mb-1" style={{ color: "#2BD9A9" }}>
                         Incoming
                       </div>
                       {flowData.incoming.length > 0 ? (
@@ -706,14 +706,14 @@ export default React.memo(function BeaconsTab({
                                 <span className="text-[10px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
                                   {f.name}
                                 </span>
-                                <span className="text-[9px] font-bold flex-shrink-0" style={{ color: "#4CAF50" }}>
+                                <span className="text-[9px] font-bold flex-shrink-0" style={{ color: "#2BD9A9" }}>
                                   {f.count}
                                 </span>
                               </div>
                               <div className="w-full h-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
                                 <div
                                   className="h-full rounded-full"
-                                  style={{ width: `${Math.max(4, (f.count / maxFlowCount) * 100)}%`, background: "#4CAF50", opacity: 0.7 }}
+                                  style={{ width: `${Math.max(4, (f.count / maxFlowCount) * 100)}%`, background: "#2BD9A9", opacity: 0.7 }}
                                 />
                               </div>
                             </div>
@@ -725,7 +725,7 @@ export default React.memo(function BeaconsTab({
                     </div>
                     {/* Outgoing */}
                     <div className="skeuo-inset rounded-md p-1.5">
-                      <div className="text-[7px] font-bold uppercase tracking-wider mb-1" style={{ color: "#F7941D" }}>
+                      <div className="text-[9px] font-medium mb-1" style={{ color: "#FFB020" }}>
                         Outgoing
                       </div>
                       {flowData.outgoing.length > 0 ? (
@@ -736,14 +736,14 @@ export default React.memo(function BeaconsTab({
                                 <span className="text-[10px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
                                   {f.name}
                                 </span>
-                                <span className="text-[9px] font-bold flex-shrink-0" style={{ color: "#F7941D" }}>
+                                <span className="text-[9px] font-bold flex-shrink-0" style={{ color: "#FFB020" }}>
                                   {f.count}
                                 </span>
                               </div>
                               <div className="w-full h-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
                                 <div
                                   className="h-full rounded-full"
-                                  style={{ width: `${Math.max(4, (f.count / maxFlowCount) * 100)}%`, background: "#F7941D", opacity: 0.7 }}
+                                  style={{ width: `${Math.max(4, (f.count / maxFlowCount) * 100)}%`, background: "#FFB020", opacity: 0.7 }}
                                 />
                               </div>
                             </div>
@@ -759,7 +759,7 @@ export default React.memo(function BeaconsTab({
 
               {/* Visitors — fills remaining height */}
               <div className="px-3 py-2 flex-1 min-h-0 flex flex-col overflow-hidden">
-                <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+                <div className="text-[9px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
                   Visitors ({visitors.length})
                 </div>
                 <div className="skeuo-inset p-1.5 flex-1 min-h-0 overflow-y-auto">

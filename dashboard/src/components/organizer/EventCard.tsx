@@ -55,7 +55,7 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
             </div>
           )}
           {isLive && (
-            <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full skeuo-led" style={{ background: "#00D4F5", color: "#00D4F5" }} />
+            <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full skeuo-led" style={{ background: "var(--green)", color: "var(--green)" }} />
           )}
         </div>
 
@@ -76,12 +76,16 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
             </div>
           )}
           {data && !loading && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] font-bold" title="Attendees" style={{ color: "#0095FF" }}>{data.totalAttendees}</span>
-              <span style={{ color: "var(--text-tertiary)", opacity: 0.3, fontSize: 9 }}>|</span>
-              <span className="text-[11px] font-bold" title="Avg Dwell" style={{ color: "#8CC63F" }}>{formatDur(data.avgDwellMinutes)}</span>
-              <span style={{ color: "var(--text-tertiary)", opacity: 0.3, fontSize: 9 }}>|</span>
-              <span className="text-[11px] font-bold" title="Proofs" style={{ color: "#F7941D" }}>{data.totalProofs}</span>
+            <div className="flex items-center gap-2.5 mt-1">
+              <span className="text-[11px]" title="Attendees" style={{ color: "var(--text-secondary)" }}>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{data.totalAttendees}</span> att
+              </span>
+              <span className="text-[11px]" title="Avg Dwell" style={{ color: "var(--text-secondary)" }}>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{formatDur(data.avgDwellMinutes)}</span>
+              </span>
+              <span className="text-[11px]" title="Proofs" style={{ color: "var(--text-secondary)" }}>
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{data.totalProofs}</span> proofs
+              </span>
             </div>
           )}
         </div>
@@ -94,9 +98,9 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
         className="flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold transition-all hover:brightness-110"
         title="Open in Dashboard"
         style={{
-          background: "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)",
-          color: "#8CC63F",
-          borderTop: "1px solid #8CC63F33",
+          background: "var(--accent-dim)",
+          color: "var(--accent)",
+          borderTop: "1px solid var(--overlay-border)",
         }}
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

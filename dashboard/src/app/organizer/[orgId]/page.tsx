@@ -12,7 +12,7 @@ import { analyzeCrossEvents } from "@/lib/crossEventAnalysis";
 import EventCard from "@/components/organizer/EventCard";
 import LiveDashboard from "@/components/organizer/LiveDashboard";
 
-const EVENT_COLORS = ["#0095FF", "#00D4F5", "#F7941D", "#8CC63F", "#7B5EA7"];
+import { EVENT_COLORS } from "@/lib/theme";
 
 function formatDur(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -208,10 +208,10 @@ export default function OrganizerDashboard() {
         {/* Stats in header */}
         {aggStats && (
           <div className="flex items-center gap-4">
-            <HeaderStat label="Selected" value={loadedCount} color="#00D4F5" />
-            <HeaderStat label="Users" value={aggStats.uniqueUsers} color="#0095FF" />
-            <HeaderStat label="Dwell" value={formatDur(aggStats.avgDwell)} color="#8CC63F" />
-            <HeaderStat label="Proofs" value={aggStats.totalProofs.toLocaleString()} color="#F7941D" />
+            <HeaderStat label="Selected" value={loadedCount} />
+            <HeaderStat label="Users" value={aggStats.uniqueUsers} />
+            <HeaderStat label="Dwell" value={formatDur(aggStats.avgDwell)} />
+            <HeaderStat label="Proofs" value={aggStats.totalProofs.toLocaleString()} />
           </div>
         )}
 
@@ -245,7 +245,7 @@ export default function OrganizerDashboard() {
           <div className="w-[260px] flex-shrink-0 flex flex-col skeuo-panel overflow-hidden">
             {/* Select all / clear */}
             <div className="flex items-center gap-1.5 px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--overlay-border)" }}>
-              <span className="text-[11px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
+              <span className="text-[12px] font-medium flex-1" style={{ color: "var(--text-tertiary)" }}>
                 Events ({orgEvents.length})
               </span>
               <button onClick={selectedCount === orgEvents.length && selectedCount > 0 ? deselectAll : selectAll}
@@ -325,12 +325,11 @@ export default function OrganizerDashboard() {
   );
 }
 
-function HeaderStat({ label, value, color }: { label: string; value: string | number; color: string }) {
+function HeaderStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      <span className="text-[11px] font-bold uppercase" style={{ color: "var(--text-tertiary)" }}>{label}</span>
-      <span className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>{value}</span>
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>{label}</span>
+      <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }

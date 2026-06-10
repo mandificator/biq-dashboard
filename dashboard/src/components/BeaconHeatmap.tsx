@@ -1452,7 +1452,7 @@ export default function BeaconHeatmap({
     >
       {/* Background color */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Background</label>
+        <label className="text-[9px] font-medium block mb-1" style={{ color: "var(--text-tertiary)" }}>Background</label>
         <div className="flex items-center gap-2">
           <input type="color" value={fsSettings.bgColor} onChange={(e) => updateFs("bgColor", e.target.value)}
             className="w-6 h-6 rounded cursor-pointer border-0 p-0" style={{ background: "none" }} />
@@ -1462,7 +1462,7 @@ export default function BeaconHeatmap({
 
       {/* Text color */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Text Color</label>
+        <label className="text-[9px] font-medium block mb-1" style={{ color: "var(--text-tertiary)" }}>Text Color</label>
         <div className="flex items-center gap-2">
           <input type="color" value={fsSettings.textColor} onChange={(e) => updateFs("textColor", e.target.value)}
             className="w-6 h-6 rounded cursor-pointer border-0 p-0" style={{ background: "none" }} />
@@ -1472,7 +1472,7 @@ export default function BeaconHeatmap({
 
       {/* Show event title */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-medium flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.showTitle} onChange={(e) => updateFs("showTitle", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Show Event Title
         </label>
@@ -1494,7 +1494,7 @@ export default function BeaconHeatmap({
 
       {/* Only active beacons */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-medium flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.onlyActive1h} onChange={(e) => updateFs("onlyActive1h", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Only Active (1h)
         </label>
@@ -1502,7 +1502,7 @@ export default function BeaconHeatmap({
 
       {/* Orbit around center logo */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-medium flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.orbitCenter} onChange={(e) => updateFs("orbitCenter", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Orbit Around Logo
         </label>
@@ -1510,7 +1510,7 @@ export default function BeaconHeatmap({
 
       {/* Beacon radius */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Beacon Radius</label>
+        <label className="text-[9px] font-medium block mb-1" style={{ color: "var(--text-tertiary)" }}>Beacon Radius</label>
         <div className="flex items-center gap-2">
           <input type="range" min={8} max={60} value={fsSettings.beaconRadius} onChange={(e) => updateFs("beaconRadius", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
           <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.beaconRadius}</span>
@@ -1519,7 +1519,7 @@ export default function BeaconHeatmap({
 
       {/* PFP radius */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>PFP Radius</label>
+        <label className="text-[9px] font-medium block mb-1" style={{ color: "var(--text-tertiary)" }}>PFP Radius</label>
         <div className="flex items-center gap-2">
           <input type="range" min={4} max={30} value={fsSettings.pfpRadius} onChange={(e) => updateFs("pfpRadius", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
           <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.pfpRadius}</span>
@@ -1528,7 +1528,7 @@ export default function BeaconHeatmap({
 
       {/* Organizer logo */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Organizer Logo</label>
+        <label className="text-[9px] font-medium block mb-1" style={{ color: "var(--text-tertiary)" }}>Organizer Logo</label>
         <div className="flex items-center gap-2 mb-1.5">
           <label style={{ background: "var(--btn-bg)", border: "1px solid var(--btn-border)", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
             Upload
@@ -1556,7 +1556,7 @@ export default function BeaconHeatmap({
 
       {/* Show sponsor toggle + logo */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer mb-1" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-medium flex items-center gap-2 cursor-pointer mb-1" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.showSponsor} onChange={(e) => updateFs("showSponsor", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Show Sponsor
         </label>
@@ -1587,7 +1587,7 @@ export default function BeaconHeatmap({
 
       {/* QR Code size */}
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>QR Code Size</label>
+        <label className="text-[9px] font-medium block mb-1" style={{ color: "var(--text-tertiary)" }}>QR Code Size</label>
         <div className="flex items-center gap-2">
           <input type="range" min={20} max={120} value={fsSettings.qrSize} onChange={(e) => updateFs("qrSize", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
           <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.qrSize}</span>
@@ -2097,7 +2097,7 @@ export default function BeaconHeatmap({
 
       {/* ═══ NORMAL VIEW ═══ */}
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[10px] font-medium" style={{ color: "var(--text-tertiary)" }}>
           {hasJourney ? "User Journey" : "Event Areas"}
         </span>
         <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import {
+  CartesianGrid,
   LineChart,
   Line,
   XAxis,
@@ -59,6 +60,7 @@ export default function PresenceCompareChart({ curves, colors }: Props) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 4, right: 12, bottom: 0, left: -16 }}>
+        <CartesianGrid vertical={false} />
         <XAxis
           dataKey="minute"
           type="number"
@@ -80,12 +82,13 @@ export default function PresenceCompareChart({ curves, colors }: Props) {
             background: "var(--tooltip-bg)",
             border: "1px solid var(--tooltip-border)",
             borderRadius: 10,
-            fontSize: 11,
+            fontSize: 12,
             color: "var(--chart-text)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
           }}
           itemStyle={{ padding: 0 }}
         />
-        <Legend wrapperStyle={{ fontSize: 10 }} iconType="plainline" iconSize={14} />
+        <Legend wrapperStyle={{ fontSize: 11 }} iconType="plainline" iconSize={14} />
         {eventKeys.map((ev) => (
           <Line
             key={ev.id}

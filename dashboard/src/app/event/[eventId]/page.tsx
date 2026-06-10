@@ -481,7 +481,7 @@ export default function EventPage() {
               </div>
               <label
                 className="skeuo-btn px-3 py-1.5 text-[12px] font-bold cursor-pointer"
-                style={{ color: "#a855f7", borderColor: "#a855f744" }}
+                style={{ color: "var(--text-secondary)" }}
                 title="Upload Luma guest CSV for automatic check-in"
               >
                 {lumaTotal > 0 ? `Lu.ma ${(() => {
@@ -492,8 +492,7 @@ export default function EventPage() {
               </label>
               <button
                 onClick={() => exportCSV(processed, beaconNames)}
-                className="skeuo-btn px-3 py-1.5 text-[12px] font-bold mr-8"
-                style={{ color: "#8CC63F", borderColor: "#8CC63F44" }}
+                className="skeuo-btn-accent px-3.5 py-1.5 text-[12px] font-semibold mr-8"
               >
                 Export
               </button>

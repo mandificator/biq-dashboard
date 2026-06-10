@@ -14,7 +14,7 @@ const PresenceCompareChart = dynamic(() => import("./PresenceCompareChart"), {
   ),
 });
 
-const COLORS = ["#0095FF", "#00D4F5", "#F7941D", "#8CC63F", "#7B5EA7"];
+import { EVENT_COLORS as COLORS } from "@/lib/theme";
 
 function formatDur(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -103,7 +103,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
     <div className="h-full flex flex-col gap-3 overflow-hidden">
       {/* ── Hero: attendance flow comparison ── */}
       <div className="skeuo-panel p-3 flex flex-col flex-shrink-0" style={{ height: "34%", minHeight: 180 }}>
-        <div className="text-[11px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+        <div className="text-[12px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
           Attendance Flow <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>— concurrent attendees, aligned to event start</span>
         </div>
         <div className="flex-1 min-h-0">
@@ -124,7 +124,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
             { key: "peak" as const, label: "Peak Concurrent", max: barMetrics.maxPeak, fmt: (v: number) => String(v) },
           ]).map((metric) => (
             <div key={metric.key} className="skeuo-panel p-3 flex flex-col flex-1 min-h-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+              <div className="text-[12px] font-medium mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
                 {metric.label}
               </div>
               <div className="flex flex-col justify-start gap-[2px] flex-1 min-h-0 overflow-auto">
@@ -153,7 +153,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
         {/* Right: Users list */}
         <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0 min-h-0">
           <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
-            <span className="text-[11px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
+            <span className="text-[12px] font-medium flex-1" style={{ color: "var(--text-tertiary)" }}>
               Users ({filteredUsers.length})
             </span>
             <button
@@ -221,7 +221,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
 
       {/* ── Bottom center: User Overlap ── */}
       <div className="skeuo-panel p-3 flex flex-col flex-shrink-0">
-        <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)" }}>
+        <div className="text-[12px] font-medium mb-1" style={{ color: "var(--text-tertiary)" }}>
           User Overlap
         </div>
         <div className="overflow-auto">

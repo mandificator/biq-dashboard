@@ -21,7 +21,7 @@ const cards = [
   {
     key: "attended",
     label: "Attended",
-    color: "#0095FF",
+    color: "var(--accent)",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -34,13 +34,13 @@ const cards = [
   {
     key: "present",
     label: "Present",
-    color: "#00D4F5",
+    color: "var(--accent)",
     icon: <div className="w-2.5 h-2.5 rounded-full skeuo-led" style={{ background: "currentColor", color: "currentColor" }} />,
   },
   {
     key: "left",
     label: "Left",
-    color: "#F7941D",
+    color: "var(--accent)",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -52,7 +52,7 @@ const cards = [
   {
     key: "dwell",
     label: "Avg. Dwell",
-    color: "#8CC63F",
+    color: "var(--accent)",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -63,7 +63,7 @@ const cards = [
   {
     key: "peak",
     label: "Peak",
-    color: "#7B5EA7",
+    color: "var(--accent)",
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
@@ -93,17 +93,17 @@ export default React.memo(function StatsCards({
       {cards.map((c) => (
         <div key={c.key} className="skeuo-panel flex-1 px-4 py-2.5 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+            <div className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>
               {c.label}
             </div>
-            <div className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
+            <div className="text-[26px] font-semibold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
               {values[c.key]}
             </div>
           </div>
-          {/* Icon badge — tinted with the metric color */}
+          {/* Icon badge — accent tint, consistent across all cards */}
           <div
             className="w-8 h-8 flex items-center justify-center"
-            style={{ color: c.color, background: `${c.color}1a`, borderRadius: "50%" }}
+            style={{ color: "var(--accent)", background: "var(--accent-dim)", borderRadius: "50%" }}
           >
             {c.icon}
           </div>

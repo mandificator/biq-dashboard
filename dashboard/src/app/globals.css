@@ -6,132 +6,120 @@
 }
 
 /* ════════════════════════════════════════════════════════════════
-   biq Analytics V2 — modern dark design system
-   Components keep the legacy .skeuo-* class names; these classes
-   now render flat, layered "soft glass" cards instead of beveled
-   skeuomorphic panels.
+   biq Analytics — enterprise design system
+   Flat surfaces, one accent, quiet borders, clear hierarchy.
+   Legacy .skeuo-* class names are kept as the component vocabulary.
    ════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Surface palette — deep blue-black */
-  --bg: #0b0e14;
-  --bg-texture:
-    radial-gradient(1200px 600px at 80% -10%, rgba(0, 149, 255, 0.07), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(123, 94, 167, 0.05), transparent 55%),
-    #0b0e14;
-  --surface: #12161f;
-  --surface-raised: #1a1f2b;
-  --surface-inset: #0d1018;
-  --border-highlight: rgba(255, 255, 255, 0.08);
-  --border-shadow: rgba(0, 0, 0, 0.6);
-  --border: rgba(255, 255, 255, 0.07);
+  /* Surfaces — flat, no gradients */
+  --bg: #0e1116;
+  --bg-texture: #0e1116;
+  --surface: #161a22;
+  --surface-raised: #1c212b;
+  --surface-inset: #11141b;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(255, 255, 255, 0.12);
+  --border-shadow: rgba(0, 0, 0, 0.5);
 
-  /* Accent — logo blue */
+  /* Accent — biq blue, the only loud color */
   --accent: #0095FF;
-  --accent-dim: rgba(0, 149, 255, 0.14);
-  --accent-glow: rgba(0, 149, 255, 0.28);
+  --accent-dim: rgba(0, 149, 255, 0.12);
+  --accent-glow: rgba(0, 149, 255, 0.24);
 
-  /* Text */
-  --text-primary: #eef1f6;
-  --text-secondary: #9aa3b2;
-  --text-tertiary: #647084;
+  /* Text — 3-step hierarchy */
+  --text-primary: #f0f2f5;
+  --text-secondary: #9aa4b2;
+  --text-tertiary: #687180;
 
-  /* Semantic */
-  --green: #00D4F5;
-  --orange: #F7941D;
-  --red: #f06050;
+  /* Semantic — used sparingly (status, errors) */
+  --green: #2BD9A9;
+  --orange: #FFB020;
+  --red: #FF5D5D;
 
-  /* Subtle overlays */
+  /* Overlays */
   --overlay-subtle: rgba(255, 255, 255, 0.04);
   --overlay-border: rgba(255, 255, 255, 0.06);
-  --overlay-divider: rgba(255, 255, 255, 0.08);
-  --dot-inactive: #1c2230;
-  --header-bg: rgba(15, 19, 27, 0.85);
-  --header-border: rgba(255, 255, 255, 0.06);
-  --header-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
-  --selected-bg: linear-gradient(180deg, rgba(0, 149, 255, 0.14), rgba(0, 149, 255, 0.07));
-  --selected-shadow: inset 0 0 0 1px rgba(0, 149, 255, 0.25);
-  --btn-bg: rgba(255, 255, 255, 0.05);
-  --btn-border: rgba(255, 255, 255, 0.1);
-  --tooltip-bg: rgba(20, 25, 35, 0.96);
-  --tooltip-border: rgba(255, 255, 255, 0.1);
-  --input-bg: #0d1018;
-  --input-border: rgba(255, 255, 255, 0.12);
-  --nav-bg: rgba(13, 16, 24, 0.9);
-  --chart-tick: #647084;
-  --chart-label: #9aa3b2;
-  --chart-text: #eef1f6;
-  --icon-stroke: #eef1f6;
-  --popover-bg: #161b26;
-  --popover-border: rgba(255, 255, 255, 0.12);
-  --inset-bg: rgba(0, 0, 0, 0.18);
+  --overlay-divider: rgba(255, 255, 255, 0.09);
+  --dot-inactive: #232936;
+  --grid-line: rgba(255, 255, 255, 0.05);
 
-  /* Shadows — soft, layered */
-  --shadow-outset:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 10px 30px rgba(0, 0, 0, 0.35);
-  --shadow-inset:
-    inset 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-pressed:
-    inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  --header-bg: #12151c;
+  --header-border: rgba(255, 255, 255, 0.07);
+  --header-shadow: none;
+  --selected-bg: rgba(0, 149, 255, 0.1);
+  --selected-shadow: inset 0 0 0 1px rgba(0, 149, 255, 0.28);
+  --btn-bg: transparent;
+  --btn-border: rgba(255, 255, 255, 0.12);
+  --tooltip-bg: #1f2530;
+  --tooltip-border: rgba(255, 255, 255, 0.1);
+  --input-bg: #11141b;
+  --input-border: rgba(255, 255, 255, 0.12);
+  --nav-bg: #12151c;
+  --chart-tick: #687180;
+  --chart-label: #9aa4b2;
+  --chart-text: #f0f2f5;
+  --icon-stroke: #f0f2f5;
+  --popover-bg: #1c212b;
+  --popover-border: rgba(255, 255, 255, 0.12);
+  --inset-bg: transparent;
+
+  --shadow-outset: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-inset: none;
+  --shadow-pressed: none;
 }
 
 [data-theme="light"] {
-  --bg: #f4f5f9;
-  --bg-texture:
-    radial-gradient(1200px 600px at 80% -10%, rgba(0, 149, 255, 0.08), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(123, 94, 167, 0.06), transparent 55%),
-    #f4f5f9;
+  --bg: #f6f7f9;
+  --bg-texture: #f6f7f9;
   --surface: #ffffff;
   --surface-raised: #ffffff;
-  --surface-inset: #eceef4;
-  --border-highlight: rgba(255, 255, 255, 0.9);
-  --border-shadow: rgba(15, 23, 42, 0.1);
-  --border: rgba(15, 23, 42, 0.09);
+  --surface-inset: #f0f2f5;
+  --border: rgba(16, 24, 40, 0.1);
+  --border-highlight: rgba(16, 24, 40, 0.14);
+  --border-shadow: rgba(16, 24, 40, 0.08);
 
-  --accent: #0085e0;
-  --accent-dim: rgba(0, 133, 224, 0.1);
-  --accent-glow: rgba(0, 133, 224, 0.22);
+  --accent: #0085e8;
+  --accent-dim: rgba(0, 133, 232, 0.1);
+  --accent-glow: rgba(0, 133, 232, 0.2);
 
-  --text-primary: #131722;
-  --text-secondary: #4b5567;
-  --text-tertiary: #8a93a6;
+  --text-primary: #15191f;
+  --text-secondary: #4d5663;
+  --text-tertiary: #8a93a2;
 
-  --green: #009fc0;
-  --orange: #d97a0a;
+  --green: #0a9c75;
+  --orange: #c77700;
   --red: #d8483a;
 
-  --overlay-subtle: rgba(15, 23, 42, 0.04);
-  --overlay-border: rgba(15, 23, 42, 0.07);
-  --overlay-divider: rgba(15, 23, 42, 0.1);
-  --dot-inactive: #dde1ea;
-  --header-bg: rgba(255, 255, 255, 0.85);
-  --header-border: rgba(15, 23, 42, 0.08);
-  --header-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --selected-bg: linear-gradient(180deg, rgba(0, 133, 224, 0.12), rgba(0, 133, 224, 0.06));
-  --selected-shadow: inset 0 0 0 1px rgba(0, 133, 224, 0.3);
-  --btn-bg: rgba(15, 23, 42, 0.04);
-  --btn-border: rgba(15, 23, 42, 0.12);
-  --tooltip-bg: rgba(255, 255, 255, 0.98);
-  --tooltip-border: rgba(15, 23, 42, 0.12);
-  --input-bg: #ffffff;
-  --input-border: rgba(15, 23, 42, 0.15);
-  --nav-bg: rgba(255, 255, 255, 0.9);
-  --chart-tick: #8a93a6;
-  --chart-label: #4b5567;
-  --chart-text: #131722;
-  --icon-stroke: #131722;
-  --popover-bg: #ffffff;
-  --popover-border: rgba(15, 23, 42, 0.15);
-  --inset-bg: rgba(15, 23, 42, 0.04);
+  --overlay-subtle: rgba(16, 24, 40, 0.04);
+  --overlay-border: rgba(16, 24, 40, 0.07);
+  --overlay-divider: rgba(16, 24, 40, 0.1);
+  --dot-inactive: #dde1e8;
+  --grid-line: rgba(16, 24, 40, 0.06);
 
-  --shadow-outset:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 10px 30px rgba(15, 23, 42, 0.07);
-  --shadow-inset:
-    inset 0 1px 3px rgba(15, 23, 42, 0.08);
-  --shadow-pressed:
-    inset 0 2px 4px rgba(15, 23, 42, 0.12);
+  --header-bg: #ffffff;
+  --header-border: rgba(16, 24, 40, 0.09);
+  --header-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --selected-bg: rgba(0, 133, 232, 0.09);
+  --selected-shadow: inset 0 0 0 1px rgba(0, 133, 232, 0.3);
+  --btn-bg: transparent;
+  --btn-border: rgba(16, 24, 40, 0.14);
+  --tooltip-bg: #ffffff;
+  --tooltip-border: rgba(16, 24, 40, 0.1);
+  --input-bg: #ffffff;
+  --input-border: rgba(16, 24, 40, 0.16);
+  --nav-bg: #ffffff;
+  --chart-tick: #8a93a2;
+  --chart-label: #4d5663;
+  --chart-text: #15191f;
+  --icon-stroke: #15191f;
+  --popover-bg: #ffffff;
+  --popover-border: rgba(16, 24, 40, 0.14);
+  --inset-bg: transparent;
+
+  --shadow-outset: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-inset: none;
+  --shadow-pressed: none;
 }
 
 *:focus {
@@ -157,47 +145,46 @@ html, body {
   background: var(--accent-dim);
 }
 
-/* ── Card — flat, layered, soft border ── */
+/* ── Card — flat, quiet border, hairline shadow ── */
 .skeuo-panel {
-  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 18px rgba(0, 0, 0, 0.18);
+  border-radius: 12px;
+  box-shadow: var(--shadow-outset);
 }
 
-/* ── Inset well — quiet recessed area (chart background) ── */
+/* ── Inset well — charts sit flush on the card now ── */
 .skeuo-inset {
-  background: var(--inset-bg);
-  border: 1px solid transparent;
-  border-radius: 10px;
+  background: var(--overlay-subtle);
+  border: none;
+  border-radius: 8px;
 }
 
-/* ── Button ── */
+/* ── Button — ghost by default ── */
 .skeuo-btn {
   background: var(--btn-bg);
   border: 1px solid var(--btn-border);
   border-radius: 8px;
-  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 .skeuo-btn:hover {
-  background: var(--overlay-divider);
-  border-color: var(--popover-border);
+  background: var(--overlay-subtle);
+  border-color: var(--border-highlight);
 }
 .skeuo-btn:active {
-  transform: translateY(1px);
+  background: var(--overlay-divider);
 }
 
-/* ── Accent button ── */
+/* ── Accent button — solid, flat ── */
 .skeuo-btn-accent {
-  background: linear-gradient(180deg, #1aa5ff, #0085e8);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--accent);
+  border: 1px solid transparent;
   border-radius: 8px;
-  box-shadow: 0 4px 14px var(--accent-glow);
   color: white;
-  transition: filter 0.12s ease, transform 0.06s ease;
+  transition: filter 0.12s ease;
 }
 .skeuo-btn-accent:hover { filter: brightness(1.08); }
-.skeuo-btn-accent:active { transform: translateY(1px); }
+.skeuo-btn-accent:active { filter: brightness(0.95); }
 
 /* ── Input field ── */
 .skeuo-input {
@@ -215,15 +202,15 @@ html, body {
 /* ── Indicator LED ── */
 .skeuo-led {
   border-radius: 50%;
-  box-shadow: 0 0 8px currentColor;
+  box-shadow: 0 0 6px currentColor;
 }
 
-/* ── Tab pill group ── */
+/* ── Tab pill group — segmented control ── */
 .skeuo-tab-group {
-  background: var(--inset-bg);
+  background: var(--overlay-subtle);
   border: 1px solid var(--overlay-border);
-  border-radius: 10px;
-  padding: 3px;
+  border-radius: 9px;
+  padding: 2px;
 }
 
 /* ── Scrollbar ── */
@@ -231,16 +218,16 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--overlay-divider);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
 
-/* ── Recharts grid ── */
+/* ── Recharts ── */
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: var(--overlay-subtle) !important;
+  stroke: var(--grid-line) !important;
 }
 
 .recharts-surface:focus,
@@ -250,11 +237,11 @@ html, body {
   outline: none !important;
 }
 
-/* ── Legacy glass compat — same card style ── */
+/* ── Legacy glass compat ── */
 .glass {
-  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: var(--shadow-outset);
 }
 

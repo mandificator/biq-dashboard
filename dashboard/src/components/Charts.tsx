@@ -8,6 +8,7 @@ import {
   BarChart,
   Bar,
   Cell,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
@@ -190,12 +191,11 @@ interface DwellPoint {
 const tooltipContentStyle = {
   background: "var(--tooltip-bg)",
   border: "1px solid var(--tooltip-border)",
-  borderRadius: 8,
+  borderRadius: 10,
   color: "var(--chart-text)",
-  fontSize: 11,
-  fontFamily: "var(--font-space-mono), monospace",
+  fontSize: 12,
   padding: "8px 12px",
-  boxShadow: "0 4px 16px rgba(0,0,0,0.5), 1px 1px 2px rgba(0,0,0,0.3)",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 };
 
 function formatLabel(ts: number): string {
@@ -255,10 +255,11 @@ export const PresenceChart = React.memo(function PresenceChart({
       <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
         <defs>
           <linearGradient id={fs ? "prGradFs" : "prGrad"} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#00D4F5" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="#00D4F5" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="#0095FF" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#0095FF" stopOpacity={0.02} />
           </linearGradient>
         </defs>
+        <CartesianGrid vertical={false} />
         <XAxis dataKey="time" tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
@@ -267,11 +268,11 @@ export const PresenceChart = React.memo(function PresenceChart({
           return (
             <div style={tooltipContentStyle}>
               <div style={{ color: "var(--chart-label)", fontSize: 10, marginBottom: 2 }}>{pt.time}</div>
-              <div style={{ color: "#00D4F5", fontSize: 13, fontWeight: 700 }}>{pt.value} present</div>
+              <div style={{ color: "#0095FF", fontSize: 13, fontWeight: 700 }}>{pt.value} present</div>
             </div>
           );
         }} />
-        <Area type="monotone" dataKey="value" name="Present" stroke="#00D4F5" fill={`url(#${fs ? "prGradFs" : "prGrad"})`} strokeWidth={2}
+        <Area type="monotone" dataKey="value" name="Present" stroke="#0095FF" fill={`url(#${fs ? "prGradFs" : "prGrad"})`} strokeWidth={2}
           dot={false} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
@@ -280,11 +281,11 @@ export const PresenceChart = React.memo(function PresenceChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative">
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           Live Occupancy <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>— concurrent attendees</span>
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold" style={{ color: "#00D4F5" }}>peak {peak}</span>
+          <span className="text-[10px] font-bold" style={{ color: "#0095FF" }}>peak {peak}</span>
           <ExpandButton onClick={() => setIsFs(true)} />
         </div>
       </div>
@@ -326,6 +327,7 @@ export const DwellHistogram = React.memo(function DwellHistogram({
   const renderChart = (fs: boolean) => (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
+        <CartesianGrid vertical={false} />
         <XAxis dataKey="label" tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} interval={0} />
         <YAxis tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={({ active, payload }) => {
@@ -334,13 +336,13 @@ export const DwellHistogram = React.memo(function DwellHistogram({
           return (
             <div style={tooltipContentStyle}>
               <div style={{ color: "var(--chart-label)", fontSize: 10, marginBottom: 2 }}>{pt.label}</div>
-              <div style={{ color: "#8CC63F", fontSize: 13, fontWeight: 700 }}>{pt.value} attendees</div>
+              <div style={{ color: "#0095FF", fontSize: 13, fontWeight: 700 }}>{pt.value} attendees</div>
             </div>
           );
         }} />
         <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
           {chartData.map((_, i) => (
-            <Cell key={i} fill="#8CC63F" fillOpacity={i === maxIdx ? 0.95 : 0.5} />
+            <Cell key={i} fill="#0095FF" fillOpacity={i === maxIdx ? 0.95 : 0.5} />
           ))}
         </Bar>
       </BarChart>
@@ -350,7 +352,7 @@ export const DwellHistogram = React.memo(function DwellHistogram({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative">
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           Dwell Distribution
         </span>
         <ExpandButton onClick={() => setIsFs(true)} />
@@ -395,10 +397,11 @@ export const RetentionChart = React.memo(function RetentionChart({
       <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
         <defs>
           <linearGradient id={fs ? "rtGradFs" : "rtGrad"} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7B5EA7" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="#7B5EA7" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="#0095FF" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#0095FF" stopOpacity={0.02} />
           </linearGradient>
         </defs>
+        <CartesianGrid vertical={false} />
         <XAxis dataKey="minute" tickFormatter={(m) => formatDur(Number(m))} tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} />
         <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
@@ -407,11 +410,11 @@ export const RetentionChart = React.memo(function RetentionChart({
           return (
             <div style={tooltipContentStyle}>
               <div style={{ color: "var(--chart-label)", fontSize: 10, marginBottom: 2 }}>after {formatDur(pt.minute)}</div>
-              <div style={{ color: "#7B5EA7", fontSize: 13, fontWeight: 700 }}>{pt.pct}% still present</div>
+              <div style={{ color: "#0095FF", fontSize: 13, fontWeight: 700 }}>{pt.pct}% still present</div>
             </div>
           );
         }} />
-        <Area type="stepAfter" dataKey="pct" name="Retention" stroke="#7B5EA7" fill={`url(#${fs ? "rtGradFs" : "rtGrad"})`} strokeWidth={2}
+        <Area type="stepAfter" dataKey="pct" name="Retention" stroke="#0095FF" fill={`url(#${fs ? "rtGradFs" : "rtGrad"})`} strokeWidth={2}
           dot={false} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
@@ -420,12 +423,12 @@ export const RetentionChart = React.memo(function RetentionChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative">
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           Retention
         </span>
         <div className="flex items-center gap-2">
           {halfLife !== null && (
-            <span className="text-[10px] font-bold" style={{ color: "#7B5EA7" }} title="Time by which half the audience has left">
+            <span className="text-[10px] font-bold" style={{ color: "#0095FF" }} title="Time by which half the audience has left">
               ½ at {formatDur(halfLife)}
             </span>
           )}
@@ -470,6 +473,7 @@ export const CheckInChart = React.memo(function CheckInChart({
             <stop offset="100%" stopColor="#0095FF" stopOpacity={0.02} />
           </linearGradient>
         </defs>
+        <CartesianGrid vertical={false} />
         <XAxis dataKey="time" tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
@@ -502,7 +506,7 @@ export const CheckInChart = React.memo(function CheckInChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative" ref={containerRef}>
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           Check-ins
         </span>
         <ExpandButton onClick={() => setIsFs(true)} />
@@ -542,10 +546,11 @@ export const CheckOutChart = React.memo(function CheckOutChart({
       <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
         <defs>
           <linearGradient id={fs ? "coGradFs" : "coGrad"} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#F7941D" stopOpacity={0.3} />
-            <stop offset="100%" stopColor="#F7941D" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="#67BDFF" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="#67BDFF" stopOpacity={0.02} />
           </linearGradient>
         </defs>
+        <CartesianGrid vertical={false} />
         <XAxis dataKey="time" tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 9, fontFamily: "var(--font-space-mono)" }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
@@ -554,7 +559,7 @@ export const CheckOutChart = React.memo(function CheckOutChart({
           return (
             <div style={{ ...tooltipContentStyle, minWidth: 140, maxHeight: 200, overflowY: "auto" }}>
               <div style={{ color: "var(--chart-label)", fontSize: 9, marginBottom: 4 }}>{pt.time}</div>
-              <div style={{ color: "#F7941D", fontSize: 12, fontWeight: 700, marginBottom: pt.userIds.length > 0 ? 6 : 0 }}>{pt.value} check-outs</div>
+              <div style={{ color: "#67BDFF", fontSize: 12, fontWeight: 700, marginBottom: pt.userIds.length > 0 ? 6 : 0 }}>{pt.value} check-outs</div>
               {pt.userIds.map((uid) => { const p = profiles[uid]; const name = p?.displayName || uid.substring(0, 10); return (
                 <div key={uid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
                   <MiniAvatar src={p?.profilePicture} name={name} size={16} />
@@ -564,10 +569,10 @@ export const CheckOutChart = React.memo(function CheckOutChart({
             </div>
           );
         }} />
-        <Area type="monotone" dataKey="value" name="Check-outs" stroke="#F7941D" fill={`url(#${fs ? "coGradFs" : "coGrad"})`} strokeWidth={2}
-          dot={{ r: fs ? 5 : 4, fill: "#F7941D", stroke: "none", cursor: "pointer" }}
+        <Area type="monotone" dataKey="value" name="Check-outs" stroke="#67BDFF" fill={`url(#${fs ? "coGradFs" : "coGrad"})`} strokeWidth={2}
+          dot={{ r: fs ? 5 : 4, fill: "#67BDFF", stroke: "none", cursor: "pointer" }}
           activeDot={((props: any) => {  // eslint-disable-line @typescript-eslint/no-explicit-any
-            return <circle key={props.key} cx={props.cx} cy={props.cy} r={fs ? 8 : 6} fill="#F7941D" stroke="#fff" strokeWidth={2} cursor="pointer"
+            return <circle key={props.key} cx={props.cx} cy={props.cy} r={fs ? 8 : 6} fill="#67BDFF" stroke="#fff" strokeWidth={2} cursor="pointer"
               onClick={(e) => { e.stopPropagation(); if (!fs) handleDotClick(props); }} />;
           }) as any}
           isAnimationActive={false} />
@@ -578,7 +583,7 @@ export const CheckOutChart = React.memo(function CheckOutChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative" ref={containerRef}>
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           Check-outs
         </span>
         <ExpandButton onClick={() => setIsFs(true)} />
@@ -587,7 +592,7 @@ export const CheckOutChart = React.memo(function CheckOutChart({
       <div className="flex-1 min-h-0 mx-3 mb-3 skeuo-inset overflow-hidden">
         {renderChart(false)}
       </div>
-      {pinned && <PinnedPopup pinned={pinned} popupRef={popupRef} containerRef={containerRef} profiles={profiles} onClickUser={onClickUser} color="#F7941D" noun="check-outs" />}
+      {pinned && <PinnedPopup pinned={pinned} popupRef={popupRef} containerRef={containerRef} profiles={profiles} onClickUser={onClickUser} color="#67BDFF" noun="check-outs" />}
     </div>
   );
 });
@@ -630,14 +635,14 @@ export const DwellTimeChart = React.memo(function DwellTimeChart({
                 <span className={`${fs ? "text-[13px]" : "text-[10px]"} font-bold truncate`} style={{ color: "var(--text-primary)", maxWidth: "60%" }}>
                   {name}
                 </span>
-                <span className={`${fs ? "text-[12px]" : "text-[10px]"} font-bold flex-shrink-0`} style={{ color: "#8CC63F" }}>
+                <span className={`${fs ? "text-[12px]" : "text-[10px]"} font-bold flex-shrink-0`} style={{ color: "#0095FF" }}>
                   {formatDur(d.minutes)}
                 </span>
               </div>
               <div className={`w-full ${fs ? "h-1.5" : "h-1"} rounded-full`} style={{ background: "rgba(255,255,255,0.06)" }}>
                 <div
                   className="h-full rounded-full"
-                  style={{ width: `${barWidth}%`, background: "#8CC63F", opacity: 0.8 }}
+                  style={{ width: `${barWidth}%`, background: "#0095FF", opacity: 0.8 }}
                 />
               </div>
             </div>
@@ -670,7 +675,7 @@ export const DwellTimeChart = React.memo(function DwellTimeChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden">
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           Dwell Time
         </span>
         <div className="flex items-center gap-1.5">

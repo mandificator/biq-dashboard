@@ -50,8 +50,7 @@ export default function SideNav() {
       style={{
         width: 48,
         background: "var(--nav-bg)",
-        borderRight: "1px solid rgba(0,0,0,0.5)",
-        boxShadow: "1px 0 4px rgba(0,0,0,0.3), inset -1px 0 0 rgba(255,255,255,0.03)",
+        borderRight: "1px solid var(--header-border)",
       }}
     >
       {/* Logo — always links to organizer list */}
@@ -78,13 +77,8 @@ export default function SideNav() {
             title={item.label}
             className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-100"
             style={{
-              color: active ? "var(--text-primary)" : "var(--text-tertiary)",
-              background: active
-                ? "var(--selected-bg)"
-                : "transparent",
-              boxShadow: active
-                ? "1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)"
-                : "none",
+              color: active ? "var(--accent)" : "var(--text-tertiary)",
+              background: active ? "var(--accent-dim)" : "transparent",
             }}
           >
             {item.icon}

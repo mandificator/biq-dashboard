@@ -129,9 +129,9 @@ export default function OrganizerIndex() {
       <header
         className="flex-shrink-0 flex items-center px-5 h-[52px]"
         style={{
-          background: "linear-gradient(180deg, #2e2e34 0%, #242428 60%, #202024 100%)",
-          borderBottom: "1px solid rgba(0,0,0,0.5)",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
+          background: "var(--header-bg)",
+          borderBottom: "1px solid var(--header-border)",
+          boxShadow: "var(--header-shadow)",
         }}
       >
         <span className="text-[12px] font-bold" style={{ color: "var(--text-secondary)" }}>

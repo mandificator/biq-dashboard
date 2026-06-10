@@ -84,7 +84,7 @@ function UserRow({ user, isSelected, onSelect, lumaGuest }: {
           {lumaGuest && (
             <span
               className="text-[7px] font-bold px-1 py-0 rounded"
-              style={{ background: "#a855f722", color: "#a855f7", border: "1px solid #a855f733" }}
+              style={{ background: "#8B7CF622", color: "#8B7CF6", border: "1px solid #8B7CF633" }}
               title={`Luma: ${lumaGuest.name} (${lumaGuest.email})`}
             >
               LU.MA
@@ -112,7 +112,7 @@ function UserColumn({ title, count, color, icon, users, selectedUserId, onSelect
     <div className="skeuo-panel flex-1 min-w-0 flex flex-col overflow-hidden">
       <div className="px-2 py-1.5 flex items-center gap-1.5" style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}>
         <span style={{ fontSize: "12px" }}>{icon}</span>
-        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{title}</span>
+        <span className="text-[10px] font-medium" style={{ color }}>{title}</span>
         <span
           className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md"
           style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}
@@ -173,9 +173,9 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
             <span
               className="px-2 py-0.5 rounded-md text-[9px] font-bold"
               style={{
-                background: "linear-gradient(180deg, #a855f722 0%, #a855f711 100%)",
-                color: "#a855f7",
-                border: "1px solid #a855f733",
+                background: "linear-gradient(180deg, #8B7CF622 0%, #8B7CF611 100%)",
+                color: "#8B7CF6",
+                border: "1px solid #8B7CF633",
               }}
               title={`Luma: ${lumaGuest.name} (${lumaGuest.email})`}
             >
@@ -186,10 +186,10 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
             className="px-2 py-0.5 rounded-md text-[9px] font-bold"
             style={{
               background: user.status === "present"
-                ? "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)"
-                : "linear-gradient(180deg, #F7941D22 0%, #F7941D11 100%)",
-              color: user.status === "present" ? "#8CC63F" : "#F7941D",
-              border: `1px solid ${user.status === "present" ? "#8CC63F33" : "#F7941D33"}`,
+                ? "linear-gradient(180deg, #2BD9A922 0%, #2BD9A911 100%)"
+                : "linear-gradient(180deg, #FFB02022 0%, #FFB02011 100%)",
+              color: user.status === "present" ? "#2BD9A9" : "#FFB020",
+              border: `1px solid ${user.status === "present" ? "#2BD9A933" : "#FFB02033"}`,
             }}
           >
             {user.status === "present" ? "Present" : "Left"}
@@ -209,7 +209,7 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
           { label: "Proofs", value: String(user.proofCount) },
         ].map((s) => (
           <div key={s.label} className="skeuo-inset px-2 py-1.5 rounded-md">
-            <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
+            <div className="text-[9px] font-medium" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
             <div className="text-[10px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
           </div>
         ))}
@@ -217,7 +217,7 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
 
       {/* Timeline */}
       <div className="flex-1 overflow-hidden flex flex-col px-3 py-2">
-        <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>Timeline</div>
+        <div className="text-[9px] font-medium mb-1.5" style={{ color: "var(--text-tertiary)" }}>Timeline</div>
         <div className="flex-1 overflow-y-auto skeuo-inset p-1.5">
           <div className="space-y-0.5">
             {user.beaconTimeline.map((entry, i) => {
@@ -297,12 +297,12 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
 
   const tabs: { key: Filter; label: string; count: number; color: string }[] = [
     { key: "all", label: "All", count: all.length, color: "#0095FF" },
-    { key: "present", label: "Present", count: presentCount, color: "#8CC63F" },
-    { key: "left", label: "Left", count: leftCount, color: "#F7941D" },
+    { key: "present", label: "Present", count: presentCount, color: "#2BD9A9" },
+    { key: "left", label: "Left", count: leftCount, color: "#FFB020" },
   ];
 
   if (lumaGuests && Object.keys(lumaGuests).length > 0) {
-    tabs.push({ key: "luma", label: "Lu.ma", count: lumaCount, color: "#a855f7" });
+    tabs.push({ key: "luma", label: "Lu.ma", count: lumaCount, color: "#8B7CF6" });
   }
 
   return (
@@ -335,11 +335,11 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
               className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${(lumaCount / Object.keys(lumaGuests).length) * 100}%`,
-                background: "linear-gradient(90deg, #a855f7, #7c3aed)",
+                background: "linear-gradient(90deg, #8B7CF6, #6f5bd8)",
               }}
             />
           </div>
-          <span className="text-[9px] font-bold" style={{ color: "#a855f7" }}>
+          <span className="text-[9px] font-bold" style={{ color: "#8B7CF6" }}>
             {lumaCount}/{Object.keys(lumaGuests).length}
           </span>
         </div>
