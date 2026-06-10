@@ -35,7 +35,7 @@ const cards = [
     key: "present",
     label: "Present",
     color: "#00D4F5",
-    icon: <div className="w-2.5 h-2.5 rounded-full skeuo-led" style={{ background: "var(--text-tertiary)", color: "var(--text-tertiary)" }} />,
+    icon: <div className="w-2.5 h-2.5 rounded-full skeuo-led" style={{ background: "currentColor", color: "currentColor" }} />,
   },
   {
     key: "left",
@@ -100,10 +100,10 @@ export default React.memo(function StatsCards({
               {values[c.key]}
             </div>
           </div>
-          {/* Icon badge — inset well */}
+          {/* Icon badge — tinted with the metric color */}
           <div
-            className="skeuo-inset w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ color: "var(--text-tertiary)", borderRadius: "50%" }}
+            className="w-8 h-8 flex items-center justify-center"
+            style={{ color: c.color, background: `${c.color}1a`, borderRadius: "50%" }}
           >
             {c.icon}
           </div>

@@ -64,7 +64,7 @@
   --icon-stroke: #eef1f6;
   --popover-bg: #161b26;
   --popover-border: rgba(255, 255, 255, 0.12);
-  --inset-bg: rgba(0, 0, 0, 0.25);
+  --inset-bg: rgba(0, 0, 0, 0.18);
 
   /* Shadows — soft, layered */
   --shadow-outset:
@@ -151,7 +151,10 @@ html, body {
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: 0.01em;
+}
+
+::selection {
+  background: var(--accent-dim);
 }
 
 /* ── Card — flat, layered, soft border ── */
@@ -159,13 +162,13 @@ html, body {
   background: linear-gradient(180deg, var(--surface-raised), var(--surface));
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: var(--shadow-outset);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
 /* ── Inset well — quiet recessed area (chart background) ── */
 .skeuo-inset {
   background: var(--inset-bg);
-  border: 1px solid var(--overlay-border);
+  border: 1px solid transparent;
   border-radius: 10px;
 }
 
@@ -224,7 +227,7 @@ html, body {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--overlay-divider);

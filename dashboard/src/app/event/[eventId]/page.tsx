@@ -256,8 +256,15 @@ export default function EventPage() {
       const hasAllSaved = allBeaconIds.length > 0 && allBeaconIds.every((id) => savedPos[id]);
       setBeaconPositions(hasAllSaved ? savedPos : initCirclePositions(data.beacons));
 
-      const savedNames = loadFromStorage<Record<string, string>>(`biq-beacon-names-${eid}`, {});
-      setBeaconNames(savedNames);
+      // Beacon names are global (keyed by beaconId) so a renamed beacon keeps
+      // its name across all events. Legacy per-event names seed the global map.
+      const legacyNames = loadFromStorage<Record<string, string>>(`biq-beacon-names-${eid}`, {});
+      const globalNames = loadFromStorage<Record<string, string>>("biq-beacon-names", {});
+      const mergedNames = { ...legacyNames, ...globalNames };
+      if (Object.keys(legacyNames).length > 0) {
+        saveToStorage("biq-beacon-names", mergedNames);
+      }
+      setBeaconNames(mergedNames);
 
       // Auto-select first user
       if (proc.userDetails.length > 0) {
@@ -313,10 +320,12 @@ export default function EventPage() {
   const handleNameChange = useCallback((beaconId: string, name: string) => {
     setBeaconNames((prev) => {
       const next = { ...prev, [beaconId]: name };
-      if (eventId) saveToStorage(`biq-beacon-names-${eventId}`, next);
+      // Persist globally so the name survives across events and reloads
+      const global = loadFromStorage<Record<string, string>>("biq-beacon-names", {});
+      saveToStorage("biq-beacon-names", { ...global, [beaconId]: name });
       return next;
     });
-  }, [eventId]);
+  }, []);
 
   const handleChartClickUser = useCallback((uid: string) => {
     setSelectedUserId(uid);

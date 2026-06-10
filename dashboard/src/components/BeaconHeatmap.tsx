@@ -1107,15 +1107,24 @@ export default function BeaconHeatmap({
   const staticSvg = useMemo(() => (
     <>
       <defs>
-        {beaconList.map((b) => {
-          const color = getHeatColor(beaconProofCounts[b.id] || 0);
-          return (
-            <radialGradient key={`glow-${b.id}`} id={`glow-${b.id}`}>
-              <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-              <stop offset="100%" stopColor={color} stopOpacity="0" />
-            </radialGradient>
-          );
-        })}
+        {/* Thermal heatmap: soft white blobs whose accumulated alpha is
+            mapped through a blue→cyan→green→yellow→orange→red color ramp. */}
+        <radialGradient id="heat-blob">
+          <stop offset="0%" stopColor="#fff" stopOpacity="1" />
+          <stop offset="55%" stopColor="#fff" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+        <filter id="heat-ramp" x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation="5" />
+          {/* copy alpha (= heat intensity) into all channels */}
+          <feColorMatrix type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 1 0" />
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0.05 0 0.05 0.9 1 1" />
+            <feFuncG type="table" tableValues="0 0.3 0.8 0.95 0.95 0.6 0.2" />
+            <feFuncB type="table" tableValues="0 0.95 0.95 0.35 0.1 0.05 0.05" />
+            <feFuncA type="table" tableValues="0 0.5 0.62 0.72 0.8 0.88 0.95" />
+          </feComponentTransfer>
+        </filter>
         <marker id="journey-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
           <polygon points="0 0.8, 6 3, 0 5.2" fill="#00D4F5" opacity="0.8" />
         </marker>
@@ -1157,6 +1166,37 @@ export default function BeaconHeatmap({
   // ── Interactive SVG layer (transitions, beacons, labels) — NOT memoized to allow smooth drag ──
   const interactiveSvg = (
     <>
+      {/* Thermal heat layer — under everything */}
+      {!isFullscreen && (() => {
+        const maxDwell = userBeaconDwell ? Math.max(1, ...Object.values(userBeaconDwell)) : 0;
+        return (
+          <g filter="url(#heat-ramp)" style={{ pointerEvents: "none" }}>
+            {beaconList.map((b) => {
+              const pos = getPos(b.id);
+              if (!pos) return null;
+              if (visibleBeaconIds && !visibleBeaconIds.has(b.id)) return null;
+              const dimmed = (!!journeySummary && !journeySummary.beaconIds.has(b.id)) || (!!activeSelectedId && b.id !== activeSelectedId) || (!!filteredBeaconIds && !filteredBeaconIds.includes(b.id));
+              if (dimmed) return null;
+              let intensity: number;
+              if (selectedUserId) {
+                const dwellSec = userBeaconDwell?.[b.id] ?? 0;
+                if (dwellSec <= 0) return null;
+                intensity = dwellSec / maxDwell;
+              } else {
+                const count = beaconProofCounts[b.id] || 0;
+                if (count <= 0) return null;
+                intensity = count / maxCount;
+              }
+              const r = 30 + intensity * 34;
+              return (
+                <circle key={`heat-${b.id}`} cx={pos.x} cy={pos.y} r={r}
+                  fill="url(#heat-blob)" opacity={0.22 + intensity * 0.78} />
+              );
+            })}
+          </g>
+        );
+      })()}
+
       {/* Transition lines */}
       {!hasJourney && !selectedUserId && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
         const fromPos = getPos(t.from);
@@ -1171,8 +1211,8 @@ export default function BeaconHeatmap({
         const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
         const len = Math.sqrt(dx * dx + dy * dy);
         if (len === 0) return null;
-        const fromRadius = isFullscreen ? fsSettings.beaconRadius : 18 + ((beaconProofCounts[t.from] || 0) / maxCount) * 22;
-        const toRadius = isFullscreen ? fsSettings.beaconRadius : 18 + ((beaconProofCounts[t.to] || 0) / maxCount) * 22;
+        const fromRadius = isFullscreen ? fsSettings.beaconRadius : 12;
+        const toRadius = isFullscreen ? fsSettings.beaconRadius : 12;
         const ux = dx / len, uy = dy / len;
         return (
           <line key={`trans-${i}`} x1={fromPos.x + ux * fromRadius} y1={fromPos.y + uy * fromRadius}
@@ -1205,10 +1245,8 @@ export default function BeaconHeatmap({
           const nx = -pdy / len * side;
           const ny = pdx / len * side;
 
-          const fromCount = beaconProofCounts[seg.from] || 0;
-          const toCount = beaconProofCounts[seg.to] || 0;
-          const fromRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (fromCount / maxCount) * 22;
-          const toRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (toCount / maxCount) * 22;
+          const fromRadius = isFullscreen ? fsSettings.beaconRadius : 12;
+          const toRadius = isFullscreen ? fsSettings.beaconRadius : 12;
           const ux = dx / len, uy = dy / len;
           const x1 = fromPos.x + ux * (fromRadius + 2) + nx;
           const y1 = fromPos.y + uy * (fromRadius + 2) + ny;
@@ -1226,21 +1264,7 @@ export default function BeaconHeatmap({
 
       {/* Beacon nodes */}
       {!(isFullscreen && fsSettings.orbitCenter) && (() => {
-        // Dwell heatmap: blue (low) → yellow → red (high)
-        const maxDwell = userBeaconDwell ? Math.max(1, ...Object.values(userBeaconDwell)) : 0;
-        const dwellHeatColor = (seconds: number) => {
-          const t = Math.min(1, seconds / maxDwell);
-          // blue → cyan → yellow → orange → red
-          if (t < 0.25) { const s = t / 0.25; return `rgb(${Math.round(30 + s * 0)}, ${Math.round(100 + s * 155)}, ${Math.round(200 + s * 55)})`; }
-          if (t < 0.5) { const s = (t - 0.25) / 0.25; return `rgb(${Math.round(30 + s * 225)}, ${Math.round(255)}, ${Math.round(255 - s * 55)})`; }
-          if (t < 0.75) { const s = (t - 0.5) / 0.25; return `rgb(${Math.round(255)}, ${Math.round(255 - s * 130)}, ${Math.round(200 - s * 200)})`; }
-          const s = (t - 0.75) / 0.25; return `rgb(${Math.round(255 - s * 35)}, ${Math.round(125 - s * 95)}, 0)`;
-        };
-
-        // When user selected: base radius is small, grows with dwell
-        const baseRadius = 16;
-        const totalDwell = userBeaconDwell ? Object.values(userBeaconDwell).reduce((a, b) => a + b, 0) : 0;
-        const userActive = selectedUserId && totalDwell > 0;
+        const formatDwell = (s: number) => s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)}m`;
 
         return beaconList.map((b) => {
           const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : activePositions[b.id];
@@ -1248,52 +1272,59 @@ export default function BeaconHeatmap({
           if (visibleBeaconIds && !visibleBeaconIds.has(b.id)) return null;
           if (fsActiveBeaconIds && !fsActiveBeaconIds.has(b.id)) return null;
           const count = beaconProofCounts[b.id] || 0;
-          const defaultRadius = isFullscreen ? fsSettings.beaconRadius : 18 + (count / maxCount) * 22;
           const defaultColor = getHeatColor(count);
           const isInJourney = journeySummary ? journeySummary.beaconIds.has(b.id) : false;
-          const isJourneyStart = journeySummary ? b.id === journeySummary.startBeaconId : false;
-          const isJourneyEnd = journeySummary ? b.id === journeySummary.endBeaconId : false;
           const dimmed = (!!journeySummary && !isInJourney) || (!!activeSelectedId && b.id !== activeSelectedId) || (!!filteredBeaconIds && !filteredBeaconIds.includes(b.id));
 
           // User-specific mode: grey + small when not visited, colored + growing with dwell
           const dwellSec = userBeaconDwell?.[b.id] ?? 0;
           const hasVisited = selectedUserId && dwellSec > 0;
-          let color: string;
-          let nodeRadius: number;
-          let fillOpacity: number;
-          let coreOpacity: number;
 
-          if (selectedUserId && !isFullscreen) {
-            if (hasVisited) {
-              color = dwellHeatColor(dwellSec);
-              // Radius grows from base to max based on proportion of total dwell
-              nodeRadius = baseRadius + (dwellSec / Math.max(1, maxDwell)) * 24;
-              fillOpacity = 0.35;
-              coreOpacity = 1;
-            } else {
-              // Not visited yet: grey, small
-              color = "#555";
-              nodeRadius = baseRadius;
-              fillOpacity = 0.08;
-              coreOpacity = 0.4;
-            }
-          } else {
-            color = defaultColor;
-            nodeRadius = defaultRadius;
-            fillOpacity = 0.12;
-            coreOpacity = 0.95;
+          if (isFullscreen) {
+            // Fullscreen display mode keeps the classic solid nodes
+            const color = defaultColor;
+            const nodeRadius = fsSettings.beaconRadius;
+            return (
+              <g key={b.id} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
+                onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.25 : 1}>
+                <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill={color} opacity={0.12} />
+                <circle cx={pos.x} cy={pos.y} r={nodeRadius * 0.55} fill={color} opacity={0.95} />
+                <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
+                  fill={fsSettings.textColor} fontSize={Math.max(5, nodeRadius * 0.25)}
+                  fontWeight="700" style={{ pointerEvents: "none" }}>{truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 10)}</text>
+              </g>
+            );
           }
 
+          // Widget mode: clean marker dot + labels; the thermal layer below
+          // carries the intensity information.
+          const isSelected = activeSelectedId === b.id;
+          const grey = selectedUserId && !hasVisited;
+          const sub = selectedUserId
+            ? (hasVisited ? formatDwell(dwellSec) : "")
+            : (count > 0 ? String(count) : "");
           return (
             <g key={b.id} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
-              onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.25 : 1}>
-              <circle cx={pos.x} cy={pos.y} r={nodeRadius * 2.5} fill={hasVisited ? `url(#glow-${b.id})` : "none"} />
-              <circle cx={pos.x} cy={pos.y} r={nodeRadius} fill={color} opacity={fillOpacity} />
-              <circle cx={pos.x} cy={pos.y} r={nodeRadius * 0.55} fill={color} opacity={coreOpacity} />
-              <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="central"
-                fill={isFullscreen ? fsSettings.textColor : (selectedUserId && !hasVisited) ? "var(--text-tertiary)" : "white"}
-                fontSize={Math.max(5, nodeRadius * 0.25)}
-                fontWeight="700" style={{ pointerEvents: "none", textShadow: hasVisited ? "0 1px 2px rgba(0,0,0,0.8)" : "none" }}>{truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 10)}</text>
+              onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.3 : 1}>
+              <circle cx={pos.x} cy={pos.y} r={16} fill="transparent" />
+              {isSelected && (
+                <circle cx={pos.x} cy={pos.y} r={7.5} fill="none" stroke="#0095FF" strokeWidth={1.5} />
+              )}
+              <circle cx={pos.x} cy={pos.y} r={3.2}
+                fill={grey ? "var(--text-tertiary)" : "var(--chart-text)"}
+                stroke="rgba(0,0,0,0.35)" strokeWidth={0.8} opacity={grey ? 0.5 : 0.95} />
+              <text x={pos.x} y={pos.y - 9} textAnchor="middle"
+                fill={grey ? "var(--text-tertiary)" : "var(--chart-text)"} fontSize={7.5} fontWeight="700"
+                style={{ pointerEvents: "none", paintOrder: "stroke", stroke: "var(--bg)", strokeWidth: 2.5, strokeLinejoin: "round" } as React.CSSProperties}>
+                {truncName(getBeaconName(b).replace(/^HW\s*/i, ""), 14)}
+              </text>
+              {sub && (
+                <text x={pos.x} y={pos.y + 14} textAnchor="middle"
+                  fill="var(--text-secondary)" fontSize={6.5} fontWeight="600"
+                  style={{ pointerEvents: "none", paintOrder: "stroke", stroke: "var(--bg)", strokeWidth: 2, strokeLinejoin: "round" } as React.CSSProperties}>
+                  {sub}
+                </text>
+              )}
             </g>
           );
         });
@@ -1378,7 +1409,7 @@ export default function BeaconHeatmap({
     >
       {/* Background color */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Background</label>
+        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Background</label>
         <div className="flex items-center gap-2">
           <input type="color" value={fsSettings.bgColor} onChange={(e) => updateFs("bgColor", e.target.value)}
             className="w-6 h-6 rounded cursor-pointer border-0 p-0" style={{ background: "none" }} />
@@ -1388,7 +1419,7 @@ export default function BeaconHeatmap({
 
       {/* Text color */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Text Color</label>
+        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Text Color</label>
         <div className="flex items-center gap-2">
           <input type="color" value={fsSettings.textColor} onChange={(e) => updateFs("textColor", e.target.value)}
             className="w-6 h-6 rounded cursor-pointer border-0 p-0" style={{ background: "none" }} />
@@ -1398,21 +1429,21 @@ export default function BeaconHeatmap({
 
       {/* Show event title */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.showTitle} onChange={(e) => updateFs("showTitle", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Show Event Title
         </label>
         {fsSettings.showTitle && (
           <div className="flex flex-col gap-1.5 mt-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[7px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Size</span>
+              <span className="text-[9px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Size</span>
               <input type="range" min={16} max={120} value={fsSettings.titleSize} onChange={(e) => updateFs("titleSize", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-              <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.titleSize}</span>
+              <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.titleSize}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[7px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Top</span>
+              <span className="text-[9px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Top</span>
               <input type="range" min={0} max={300} value={fsSettings.titleTop} onChange={(e) => updateFs("titleTop", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-              <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.titleTop}</span>
+              <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.titleTop}</span>
             </div>
           </div>
         )}
@@ -1420,7 +1451,7 @@ export default function BeaconHeatmap({
 
       {/* Only active beacons */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.onlyActive1h} onChange={(e) => updateFs("onlyActive1h", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Only Active (1h)
         </label>
@@ -1428,7 +1459,7 @@ export default function BeaconHeatmap({
 
       {/* Orbit around center logo */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.orbitCenter} onChange={(e) => updateFs("orbitCenter", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Orbit Around Logo
         </label>
@@ -1436,45 +1467,45 @@ export default function BeaconHeatmap({
 
       {/* Beacon radius */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Beacon Radius</label>
+        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Beacon Radius</label>
         <div className="flex items-center gap-2">
           <input type="range" min={8} max={60} value={fsSettings.beaconRadius} onChange={(e) => updateFs("beaconRadius", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-          <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.beaconRadius}</span>
+          <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.beaconRadius}</span>
         </div>
       </div>
 
       {/* PFP radius */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>PFP Radius</label>
+        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>PFP Radius</label>
         <div className="flex items-center gap-2">
           <input type="range" min={4} max={30} value={fsSettings.pfpRadius} onChange={(e) => updateFs("pfpRadius", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-          <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.pfpRadius}</span>
+          <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.pfpRadius}</span>
         </div>
       </div>
 
       {/* Organizer logo */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Organizer Logo</label>
+        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>Organizer Logo</label>
         <div className="flex items-center gap-2 mb-1.5">
           <label style={{ background: "var(--btn-bg)", border: "1px solid var(--btn-border)", borderRadius: 6, padding: "2px 8px", fontSize: 8, fontWeight: 700, cursor: "pointer", color: "var(--text-secondary)" }}>
             Upload
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoUpload(e, "orgLogo")} />
           </label>
           {fsSettings.orgLogo && (
-            <button onClick={() => updateFs("orgLogo", null)} className="text-[8px] font-bold" style={{ color: "var(--text-tertiary)" }}>Remove</button>
+            <button onClick={() => updateFs("orgLogo", null)} className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>Remove</button>
           )}
         </div>
         {fsSettings.orgLogo && (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[7px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Size</span>
+              <span className="text-[9px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Size</span>
               <input type="range" min={40} max={300} value={fsSettings.orgSize} onChange={(e) => updateFs("orgSize", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-              <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.orgSize}</span>
+              <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.orgSize}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[7px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Alpha</span>
+              <span className="text-[9px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Alpha</span>
               <input type="range" min={5} max={100} value={fsSettings.orgOpacity} onChange={(e) => updateFs("orgOpacity", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-              <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.orgOpacity}%</span>
+              <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.orgOpacity}%</span>
             </div>
           </div>
         )}
@@ -1482,7 +1513,7 @@ export default function BeaconHeatmap({
 
       {/* Show sponsor toggle + logo */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer mb-1" style={{ color: "var(--text-tertiary)" }}>
+        <label className="text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer mb-1" style={{ color: "var(--text-tertiary)" }}>
           <input type="checkbox" checked={fsSettings.showSponsor} onChange={(e) => updateFs("showSponsor", e.target.checked)} className="w-3 h-3 accent-[#0095FF]" />
           Show Sponsor
         </label>
@@ -1492,20 +1523,20 @@ export default function BeaconHeatmap({
             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoUpload(e, "sponsorLogo")} />
           </label>
           {fsSettings.sponsorLogo && (
-            <button onClick={() => updateFs("sponsorLogo", null)} className="text-[8px] font-bold" style={{ color: "var(--text-tertiary)" }}>Remove</button>
+            <button onClick={() => updateFs("sponsorLogo", null)} className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>Remove</button>
           )}
         </div>
         {fsSettings.sponsorLogo && (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[7px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Size</span>
+              <span className="text-[9px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Size</span>
               <input type="range" min={40} max={300} value={fsSettings.sponsorSize} onChange={(e) => updateFs("sponsorSize", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-              <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.sponsorSize}</span>
+              <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.sponsorSize}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[7px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Alpha</span>
+              <span className="text-[9px] w-[28px]" style={{ color: "var(--text-tertiary)" }}>Alpha</span>
               <input type="range" min={5} max={100} value={fsSettings.sponsorOpacity} onChange={(e) => updateFs("sponsorOpacity", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-              <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.sponsorOpacity}%</span>
+              <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.sponsorOpacity}%</span>
             </div>
           </div>
         )}
@@ -1513,10 +1544,10 @@ export default function BeaconHeatmap({
 
       {/* QR Code size */}
       <div>
-        <label className="text-[8px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>QR Code Size</label>
+        <label className="text-[9px] font-bold uppercase tracking-wider block mb-1" style={{ color: "var(--text-tertiary)" }}>QR Code Size</label>
         <div className="flex items-center gap-2">
           <input type="range" min={20} max={120} value={fsSettings.qrSize} onChange={(e) => updateFs("qrSize", Number(e.target.value))} className="flex-1 h-1 accent-[#0095FF]" />
-          <span className="text-[8px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.qrSize}</span>
+          <span className="text-[9px] w-[24px] text-right" style={{ color: "var(--text-tertiary)" }}>{fsSettings.qrSize}</span>
         </div>
       </div>
     </div>
@@ -2023,11 +2054,11 @@ export default function BeaconHeatmap({
 
       {/* ═══ NORMAL VIEW ═══ */}
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
           {hasJourney ? "User Journey" : "Event Areas"}
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>
+          <span className="text-[10px] font-bold" style={{ color: "var(--text-tertiary)" }}>
             {beaconList.length} beacon{beaconList.length !== 1 ? "s" : ""}
             {journeySummary && ` \u00b7 ${journeySummary.beaconIds.size} zones \u00b7 ${journeySummary.edges.reduce((s, e) => s + e.trips, 0)} trips`}
           </span>
@@ -2042,16 +2073,16 @@ export default function BeaconHeatmap({
       </div>
       {!hasJourney && (
         <div className="px-3 pb-1.5 flex gap-1">
-          <button onClick={() => setProofRange(null)} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
+          <button onClick={() => setProofRange(null)} className="flex-1 px-1 py-0.5 rounded text-[9px] font-bold transition-all"
             style={{ background: !proofRange ? "var(--selected-bg)" : "transparent", color: !proofRange ? "var(--text-primary)" : "var(--text-tertiary)", border: !proofRange ? "1px solid var(--border-highlight)" : "1px solid transparent" }}>All</button>
           {proofRanges.map((r) => (
-            <button key={r.id} onClick={() => setProofRange(proofRange === r.id ? null : r.id)} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
+            <button key={r.id} onClick={() => setProofRange(proofRange === r.id ? null : r.id)} className="flex-1 px-1 py-0.5 rounded text-[9px] font-bold transition-all"
               style={{ background: proofRange === r.id ? "var(--selected-bg)" : "transparent", color: proofRange === r.id ? "var(--text-primary)" : "var(--text-tertiary)", border: proofRange === r.id ? "1px solid var(--border-highlight)" : "1px solid transparent" }}>{r.label}</button>
           ))}
-          <button onClick={() => setProofRange(proofRange === "last1h" ? null : "last1h")} className="flex-1 px-1 py-0.5 rounded text-[7px] font-bold transition-all"
+          <button onClick={() => setProofRange(proofRange === "last1h" ? null : "last1h")} className="flex-1 px-1 py-0.5 rounded text-[9px] font-bold transition-all"
             style={{ background: proofRange === "last1h" ? "var(--selected-bg)" : "transparent", color: proofRange === "last1h" ? "#00D4F5" : "var(--text-tertiary)", border: proofRange === "last1h" ? "1px solid #00D4F544" : "1px solid transparent" }}>1h</button>
-          <button onClick={toggleFullscreen} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 1</button>
-          <button onClick={toggleScreen2} className="px-1.5 py-0.5 rounded text-[7px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 2</button>
+          <button onClick={toggleFullscreen} className="px-1.5 py-0.5 rounded text-[9px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 1</button>
+          <button onClick={toggleScreen2} className="px-1.5 py-0.5 rounded text-[9px] font-bold transition-all skeuo-btn" style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>Screen 2</button>
         </div>
       )}
       {/* ═══ EXPANDED VIEW MODAL ═══ */}
@@ -2215,7 +2246,7 @@ export default function BeaconHeatmap({
               <div className="flex gap-0 flex-shrink-0 rounded overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
                 <button
                   onClick={() => setViewMode("lines")}
-                  className="px-2 py-1 text-[8px] font-bold"
+                  className="px-2 py-1 text-[9px] font-bold"
                   style={{
                     background: viewMode === "lines" ? "rgba(0,149,255,0.2)" : "transparent",
                     color: viewMode === "lines" ? "#0095FF" : "var(--text-tertiary)",
@@ -2230,7 +2261,7 @@ export default function BeaconHeatmap({
                 </button>
                 <button
                   onClick={() => setViewMode("pfps")}
-                  className="px-2 py-1 text-[8px] font-bold"
+                  className="px-2 py-1 text-[9px] font-bold"
                   style={{
                     background: viewMode === "pfps" ? "rgba(0,149,255,0.2)" : "transparent",
                     color: viewMode === "pfps" ? "#0095FF" : "var(--text-tertiary)",
@@ -2261,7 +2292,7 @@ export default function BeaconHeatmap({
               <div className="flex gap-0.5 flex-shrink-0">
                 {[10, 50, 100, 1000, 5000].map((s) => (
                   <button key={s} onClick={() => setPlaySpeed(s)}
-                    className="px-1.5 py-1 rounded text-[8px] font-bold"
+                    className="px-1.5 py-1 rounded text-[9px] font-bold"
                     style={{
                       background: playSpeed === s ? "linear-gradient(180deg, #0095FF 0%, #0077CC 100%)" : "transparent",
                       color: playSpeed === s ? "#fff" : "var(--text-tertiary)",
@@ -2400,6 +2431,17 @@ export default function BeaconHeatmap({
         </div>
       </div>
 
+      {/* Activity heatmap legend (default mode) */}
+      {!userBeaconDwell && !isFullscreen && maxCount > 1 && (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md"
+          style={{ position: "absolute", bottom: hasTimeline ? 52 : 12, left: 12, zIndex: 20, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+          <span className="text-[9px] font-bold" style={{ color: "rgba(255,255,255,0.5)" }}>ACTIVITY</span>
+          <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.5)" }}>low</span>
+          <div style={{ width: 60, height: 6, borderRadius: 3, background: "linear-gradient(90deg, rgb(30,100,200), rgb(30,255,255), rgb(255,255,200), rgb(255,125,0), rgb(220,30,0))" }} />
+          <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.5)" }}>high</span>
+        </div>
+      )}
+
       {/* Dwell heatmap legend */}
       {userBeaconDwell && !isFullscreen && (() => {
         const maxDwell = Math.max(1, ...Object.values(userBeaconDwell));
@@ -2407,10 +2449,10 @@ export default function BeaconHeatmap({
         return (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md"
             style={{ position: "absolute", bottom: hasTimeline ? 52 : 12, left: 12, zIndex: 20, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-            <span className="text-[7px] font-bold" style={{ color: "var(--text-tertiary)" }}>DWELL</span>
-            <span className="text-[6px]" style={{ color: "var(--text-tertiary)" }}>{formatDwellLegend(0)}</span>
+            <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>DWELL</span>
+            <span className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>{formatDwellLegend(0)}</span>
             <div style={{ width: 60, height: 6, borderRadius: 3, background: "linear-gradient(90deg, rgb(30,100,200), rgb(30,255,255), rgb(255,255,200), rgb(255,125,0), rgb(220,30,0))" }} />
-            <span className="text-[6px]" style={{ color: "var(--text-tertiary)" }}>{formatDwellLegend(maxDwell)}</span>
+            <span className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>{formatDwellLegend(maxDwell)}</span>
           </div>
         );
       })()}
@@ -2471,7 +2513,7 @@ export default function BeaconHeatmap({
           <div className="flex gap-0 flex-shrink-0 rounded overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
             <button
               onClick={() => setViewMode("lines")}
-              className="px-1.5 py-0.5 text-[7px] font-bold"
+              className="px-1.5 py-0.5 text-[9px] font-bold"
               style={{
                 background: viewMode === "lines" ? "rgba(0,149,255,0.2)" : "transparent",
                 color: viewMode === "lines" ? "#0095FF" : "var(--text-tertiary)",
@@ -2486,7 +2528,7 @@ export default function BeaconHeatmap({
             </button>
             <button
               onClick={() => setViewMode("pfps")}
-              className="px-1.5 py-0.5 text-[7px] font-bold"
+              className="px-1.5 py-0.5 text-[9px] font-bold"
               style={{
                 background: viewMode === "pfps" ? "rgba(0,149,255,0.2)" : "transparent",
                 color: viewMode === "pfps" ? "#0095FF" : "var(--text-tertiary)",
@@ -2515,7 +2557,7 @@ export default function BeaconHeatmap({
           </div>
 
           {/* Time display */}
-          <span className="text-[8px] font-mono font-bold flex-shrink-0" style={{ color: isPlaybackActive ? "#0095FF" : "var(--text-tertiary)" }}>
+          <span className="text-[9px] font-mono font-bold flex-shrink-0" style={{ color: isPlaybackActive ? "#0095FF" : "var(--text-tertiary)" }}>
             {new Date(localPlaybackTime * 1000).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit" })}
           </span>
 
@@ -2523,7 +2565,7 @@ export default function BeaconHeatmap({
           <div className="flex gap-0.5 flex-shrink-0">
             {[10, 50, 100, 1000, 5000].map((s) => (
               <button key={s} onClick={() => setPlaySpeed(s)}
-                className="px-1 py-0.5 rounded text-[7px] font-bold"
+                className="px-1 py-0.5 rounded text-[9px] font-bold"
                 style={{
                   background: playSpeed === s ? "linear-gradient(180deg, #0095FF 0%, #0077CC 100%)" : "transparent",
                   color: playSpeed === s ? "#fff" : "var(--text-tertiary)",
