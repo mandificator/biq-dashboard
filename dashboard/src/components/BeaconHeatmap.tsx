@@ -1166,11 +1166,46 @@ export default function BeaconHeatmap({
   // ── Interactive SVG layer (transitions, beacons, labels) — NOT memoized to allow smooth drag ──
   const interactiveSvg = (
     <>
-      {/* Thermal heat layer — under everything */}
+      {/* Thermal heat layer — under everything. Zone blobs plus heat
+          corridors along the paths people walk between zones (these
+          replace the old transition lines). */}
       {!isFullscreen && (() => {
         const maxDwell = userBeaconDwell ? Math.max(1, ...Object.values(userBeaconDwell)) : 0;
+        const maxTrips = journeySummary ? Math.max(1, ...journeySummary.edges.map((e) => e.trips)) : 1;
+
+        const corridor = (key: string, from: { x: number; y: number }, to: { x: number; y: number }, k: number) => {
+          const w = 7 + k * 13;
+          const o = 0.1 + k * 0.42;
+          return (
+            <g key={key}>
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                stroke="#fff" strokeWidth={w} opacity={o * 0.55} strokeLinecap="round" />
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                stroke="#fff" strokeWidth={w * 0.4} opacity={o} strokeLinecap="round" />
+            </g>
+          );
+        };
+
         return (
           <g filter="url(#heat-ramp)" style={{ pointerEvents: "none" }}>
+            {/* Corridors between zones — crowd flow (default mode) */}
+            {!selectedUserId && !hasJourney && transitions.map((t, i) => {
+              const fromPos = getPos(t.from);
+              const toPos = getPos(t.to);
+              if (!fromPos || !toPos) return null;
+              if (filteredBeaconIds && (!filteredBeaconIds.includes(t.from) || !filteredBeaconIds.includes(t.to))) return null;
+              if (visibleBeaconIds && (!visibleBeaconIds.has(t.from) || !visibleBeaconIds.has(t.to))) return null;
+              if (activeSelectedId && t.from !== activeSelectedId && t.to !== activeSelectedId) return null;
+              return corridor(`heat-corr-${i}`, fromPos, toPos, t.count / maxTransition);
+            })}
+            {/* Corridors along the selected user's journey */}
+            {selectedUserId && journeySummary && journeySummary.edges.map((e, i) => {
+              const fromPos = getPos(e.from);
+              const toPos = getPos(e.to);
+              if (!fromPos || !toPos) return null;
+              return corridor(`heat-jcorr-${i}`, fromPos, toPos, (e.trips / maxTrips) * 0.7);
+            })}
+            {/* Zone blobs */}
             {beaconList.map((b) => {
               const pos = getPos(b.id);
               if (!pos) return null;
@@ -1197,8 +1232,8 @@ export default function BeaconHeatmap({
         );
       })()}
 
-      {/* Transition lines */}
-      {!hasJourney && !selectedUserId && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
+      {/* Transition lines — fullscreen only; the widget shows heat corridors instead */}
+      {isFullscreen && !hasJourney && !selectedUserId && !fsSettings.orbitCenter && transitions.map((t, i) => {
         const fromPos = getPos(t.from);
         const toPos = getPos(t.to);
         if (!fromPos || !toPos) return null;
@@ -1264,7 +1299,12 @@ export default function BeaconHeatmap({
 
       {/* Beacon nodes */}
       {!(isFullscreen && fsSettings.orbitCenter) && (() => {
-        const formatDwell = (s: number) => s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)}m`;
+        const formatDwell = (s: number) => {
+          if (s < 60) return `${Math.round(s)} sec`;
+          const min = Math.round(s / 60);
+          if (min < 60) return `${min} min`;
+          return `${Math.floor(min / 60)}h ${min % 60}min`;
+        };
 
         return beaconList.map((b) => {
           const pos = (localDragPos && localDragPos.id === b.id) ? localDragPos : activePositions[b.id];
@@ -1302,7 +1342,7 @@ export default function BeaconHeatmap({
           const grey = selectedUserId && !hasVisited;
           const sub = selectedUserId
             ? (hasVisited ? formatDwell(dwellSec) : "")
-            : (count > 0 ? String(count) : "");
+            : (count > 0 ? `${count} proofs` : "");
           return (
             <g key={b.id} style={{ cursor: dragging === b.id ? "grabbing" : "grab" }}
               onMouseDown={(e) => handleMouseDown(b.id, e)} onDoubleClick={(e) => handleDoubleClick(b.id, e)} opacity={dimmed ? 0.3 : 1}>
@@ -1330,18 +1370,21 @@ export default function BeaconHeatmap({
         });
       })()}
 
-      {/* Transition count labels */}
+      {/* Transition count labels — in the widget only when a beacon is
+          selected (the heat corridors already convey flow at a glance) */}
       {!hasJourney && !selectedUserId && !(isFullscreen && fsSettings.orbitCenter) && transitions.map((t, i) => {
         const fromPos = getPos(t.from); const toPos = getPos(t.to);
         if (!fromPos || !toPos) return null;
         const involves = activeSelectedId && (t.from === activeSelectedId || t.to === activeSelectedId);
+        if (!isFullscreen && !involves) return null;
         const filteredOut = filteredBeaconIds && (!filteredBeaconIds.includes(t.from) || !filteredBeaconIds.includes(t.to));
         const rangeHidden = visibleBeaconIds && (!visibleBeaconIds.has(t.from) || !visibleBeaconIds.has(t.to));
         const fsHidden2 = fsActiveBeaconIds && (!fsActiveBeaconIds.has(t.from) || !fsActiveBeaconIds.has(t.to));
         if ((activeSelectedId && !involves) || filteredOut || rangeHidden || fsHidden2) return null;
         return (
           <text key={`trans-label-${i}`} x={(fromPos.x + toPos.x) / 2} y={(fromPos.y + toPos.y) / 2 - 6}
-            textAnchor="middle" fill="#8CC63F" fontSize="10" fontWeight="600" fontFamily="var(--font-mono)" style={{ pointerEvents: "none" }}>
+            textAnchor="middle" fill={isFullscreen ? "#8CC63F" : "var(--chart-text)"} fontSize="9" fontWeight="700"
+            style={{ pointerEvents: "none", paintOrder: "stroke", stroke: "var(--bg)", strokeWidth: 2.5, strokeLinejoin: "round" } as React.CSSProperties}>
             {t.count}
           </text>
         );
@@ -2445,7 +2488,12 @@ export default function BeaconHeatmap({
       {/* Dwell heatmap legend */}
       {userBeaconDwell && !isFullscreen && (() => {
         const maxDwell = Math.max(1, ...Object.values(userBeaconDwell));
-        const formatDwellLegend = (s: number) => s < 60 ? `${Math.round(s)}s` : `${Math.round(s / 60)}m`;
+        const formatDwellLegend = (s: number) => {
+          if (s < 60) return `${Math.round(s)} sec`;
+          const min = Math.round(s / 60);
+          if (min < 60) return `${min} min`;
+          return `${Math.floor(min / 60)}h ${min % 60}min`;
+        };
         return (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md"
             style={{ position: "absolute", bottom: hasTimeline ? 52 : 12, left: 12, zIndex: 20, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
