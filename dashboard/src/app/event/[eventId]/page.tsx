@@ -258,7 +258,8 @@ export default function EventPage() {
       setBeaconPositions(hasAllSaved ? savedPos : initCirclePositions(data.beacons));
 
       // Beacon names are global (keyed by beaconId) so a renamed beacon keeps
-      // its name across all events. Legacy per-event names seed the global map.
+      // its name across all events. Local copy renders immediately; the shared
+      // server store (synced across devices) takes precedence when it arrives.
       const legacyNames = loadFromStorage<Record<string, string>>(`biq-beacon-names-${eid}`, {});
       const globalNames = loadFromStorage<Record<string, string>>("biq-beacon-names", {});
       const mergedNames = { ...legacyNames, ...globalNames };
@@ -266,6 +267,27 @@ export default function EventPage() {
         saveToStorage("biq-beacon-names", mergedNames);
       }
       setBeaconNames(mergedNames);
+      fetch("/api/beacon-names")
+        .then((r) => (r.ok ? r.json() : {}))
+        .then((serverNames: Record<string, string>) => {
+          const serverCount = Object.keys(serverNames).length;
+          if (serverCount > 0) {
+            setBeaconNames((prev) => {
+              const next = { ...prev, ...serverNames };
+              saveToStorage("biq-beacon-names", next);
+              return next;
+            });
+          }
+          // First device with local names seeds the shared store
+          if (serverCount === 0 && Object.keys(mergedNames).length > 0) {
+            fetch("/api/beacon-names", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ names: mergedNames }),
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
 
       // Auto-select first user
       if (proc.userDetails.length > 0) {
@@ -321,9 +343,14 @@ export default function EventPage() {
   const handleNameChange = useCallback((beaconId: string, name: string) => {
     setBeaconNames((prev) => {
       const next = { ...prev, [beaconId]: name };
-      // Persist globally so the name survives across events and reloads
+      // Persist locally (offline fallback) and to the shared cross-device store
       const global = loadFromStorage<Record<string, string>>("biq-beacon-names", {});
       saveToStorage("biq-beacon-names", { ...global, [beaconId]: name });
+      fetch("/api/beacon-names", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names: { [beaconId]: name } }),
+      }).catch(() => {});
       return next;
     });
   }, []);

@@ -8,8 +8,6 @@ import {
   EventSummary,
 } from "@/types";
 
-const ACCESS_PASSWORD = "biqP455";
-
 export default function OrganizerIndex() {
   const router = useRouter();
   const [orgList, setOrgList] = useState<OrganizerInfo[]>([]);
@@ -26,12 +24,21 @@ export default function OrganizerIndex() {
     }
   }, []);
 
-  const handleLogin = () => {
-    if (password === ACCESS_PASSWORD) {
-      setAuthenticated(true);
-      setAuthError(false);
-      sessionStorage.setItem("biq-org-admin-auth", "1");
-    } else {
+  const handleLogin = async () => {
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setAuthenticated(true);
+        setAuthError(false);
+        sessionStorage.setItem("biq-org-admin-auth", "1");
+      } else {
+        setAuthError(true);
+      }
+    } catch {
       setAuthError(true);
     }
   };

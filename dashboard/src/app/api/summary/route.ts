@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildEventSummary } from "@/lib/summary";
 
 const API_BASE = "https://app.biq.me/api/v0/analytics";
-const AUTH_TOKEN = "Bearer r0b0_analytics";
+const AUTH_TOKEN = `Bearer ${process.env.BIQ_API_TOKEN ?? ""}`;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
