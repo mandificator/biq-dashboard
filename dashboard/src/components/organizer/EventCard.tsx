@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { EventListItem, ProcessedData } from "@/types";
+import { EventListItem, EventSummary } from "@/types";
 import Link from "next/link";
 
 interface EventCardProps {
   event: EventListItem;
   selected: boolean;
   onToggle: (eventId: string) => void;
-  data: ProcessedData | null;
+  data: EventSummary | null;
   loading: boolean;
   color: string;
 }
@@ -65,23 +65,23 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
             <div className="text-[12px] font-bold truncate leading-tight" style={{ color: "var(--text-primary)" }}>
               {event.name}
             </div>
-            <div className="text-[9px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>
               {formatDate(event.startTime)} — {formatDate(event.endTime)}
             </div>
           </div>
           {loading && (
             <div className="flex items-center gap-1 mt-1">
               <div className="w-2.5 h-2.5 rounded-full animate-spin" style={{ border: "1.5px solid var(--accent)", borderTopColor: "transparent" }} />
-              <span className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>Loading...</span>
+              <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>Loading...</span>
             </div>
           )}
           {data && !loading && (
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-[9px] font-bold" title="Attendees" style={{ color: "#0095FF" }}>{data.totalAttendees}</span>
+              <span className="text-[11px] font-bold" title="Attendees" style={{ color: "#0095FF" }}>{data.totalAttendees}</span>
               <span style={{ color: "var(--text-tertiary)", opacity: 0.3, fontSize: 9 }}>|</span>
-              <span className="text-[9px] font-bold" title="Avg Dwell" style={{ color: "#8CC63F" }}>{formatDur(data.avgDwellMinutes)}</span>
+              <span className="text-[11px] font-bold" title="Avg Dwell" style={{ color: "#8CC63F" }}>{formatDur(data.avgDwellMinutes)}</span>
               <span style={{ color: "var(--text-tertiary)", opacity: 0.3, fontSize: 9 }}>|</span>
-              <span className="text-[9px] font-bold" title="Proofs" style={{ color: "#F7941D" }}>{data.proofs.length}</span>
+              <span className="text-[11px] font-bold" title="Proofs" style={{ color: "#F7941D" }}>{data.totalProofs}</span>
             </div>
           )}
         </div>
@@ -91,7 +91,7 @@ export default React.memo(function EventCard({ event, selected, onToggle, data, 
       <Link
         href={`/event/${event.id}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold transition-all hover:brightness-110"
+        className="flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold transition-all hover:brightness-110"
         title="Open in Dashboard"
         style={{
           background: "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)",

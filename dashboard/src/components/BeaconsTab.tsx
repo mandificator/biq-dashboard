@@ -525,7 +525,7 @@ export default React.memo(function BeaconsTab({
                   }}
                 >
                   <div
-                    className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[9px] font-bold"
+                    className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
                     style={{
                       background: "var(--inset-bg)",
                       border: "1px solid rgba(255,255,255,0.06)",
@@ -551,7 +551,7 @@ export default React.memo(function BeaconsTab({
                         </span>
                       )}
                     </div>
-                    <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
+                    <div className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>
                       {b.type} &middot; {uniqueVisitors[b.id] || 0} visitors
                     </div>
                   </div>
@@ -593,7 +593,7 @@ export default React.memo(function BeaconsTab({
                 <div className="text-[12px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
                   {getBeaconDisplayName(selectedBeacon, beaconNames)}
                 </div>
-                <div className="text-[9px] truncate" style={{ color: "var(--text-tertiary)" }}>
+                <div className="text-[10px] truncate" style={{ color: "var(--text-tertiary)" }}>
                   {selectedBeacon.type}
                   {beaconNames[selectedBeacon.id] && selectedBeacon.name && beaconNames[selectedBeacon.id] !== selectedBeacon.name
                     ? ` · ${selectedBeacon.name}`
@@ -603,7 +603,7 @@ export default React.memo(function BeaconsTab({
               </div>
               {beaconClusterMap[selectedBeacon.id] && (
                 <span
-                  className="px-2 py-0.5 rounded-md text-[8px] font-bold"
+                  className="px-2 py-0.5 rounded-md text-[9px] font-bold"
                   style={{
                     background: `linear-gradient(180deg, ${beaconClusterMap[selectedBeacon.id].color}22 0%, ${beaconClusterMap[selectedBeacon.id].color}11 100%)`,
                     color: beaconClusterMap[selectedBeacon.id].color,
@@ -634,7 +634,7 @@ export default React.memo(function BeaconsTab({
                     : "—" },
                 ].map((s) => (
                   <div key={s.label} className="skeuo-inset px-2 py-1.5 rounded-md">
-                    <div className="text-[8px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
                     <div className="text-[10px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
                   </div>
                 ))}
@@ -646,7 +646,7 @@ export default React.memo(function BeaconsTab({
                   className="px-3 py-2 flex-shrink-0"
                   style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
                 >
-                  <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
+                  <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
                     Activity
                   </div>
                   <div className="skeuo-inset rounded-md overflow-hidden" style={{ height: 280 }}>
@@ -689,7 +689,7 @@ export default React.memo(function BeaconsTab({
                   className="px-3 py-2 flex-shrink-0"
                   style={{ borderBottom: "1px solid rgba(0,0,0,0.3)", boxShadow: "0 1px 0 rgba(255,255,255,0.04)" }}
                 >
-                  <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
+                  <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>
                     Flow
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -703,10 +703,10 @@ export default React.memo(function BeaconsTab({
                           {flowData.incoming.slice(0, 8).map((f) => (
                             <div key={f.beaconId}>
                               <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-[9px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
+                                <span className="text-[10px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
                                   {f.name}
                                 </span>
-                                <span className="text-[8px] font-bold flex-shrink-0" style={{ color: "#4CAF50" }}>
+                                <span className="text-[9px] font-bold flex-shrink-0" style={{ color: "#4CAF50" }}>
                                   {f.count}
                                 </span>
                               </div>
@@ -720,7 +720,7 @@ export default React.memo(function BeaconsTab({
                           ))}
                         </div>
                       ) : (
-                        <div className="text-[8px] py-1" style={{ color: "var(--text-tertiary)" }}>None</div>
+                        <div className="text-[9px] py-1" style={{ color: "var(--text-tertiary)" }}>None</div>
                       )}
                     </div>
                     {/* Outgoing */}
@@ -733,10 +733,10 @@ export default React.memo(function BeaconsTab({
                           {flowData.outgoing.slice(0, 8).map((f) => (
                             <div key={f.beaconId}>
                               <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-[9px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
+                                <span className="text-[10px] truncate" style={{ color: "var(--text-primary)", maxWidth: "70%" }}>
                                   {f.name}
                                 </span>
-                                <span className="text-[8px] font-bold flex-shrink-0" style={{ color: "#F7941D" }}>
+                                <span className="text-[9px] font-bold flex-shrink-0" style={{ color: "#F7941D" }}>
                                   {f.count}
                                 </span>
                               </div>
@@ -750,7 +750,7 @@ export default React.memo(function BeaconsTab({
                           ))}
                         </div>
                       ) : (
-                        <div className="text-[8px] py-1" style={{ color: "var(--text-tertiary)" }}>None</div>
+                        <div className="text-[9px] py-1" style={{ color: "var(--text-tertiary)" }}>None</div>
                       )}
                     </div>
                   </div>
@@ -759,7 +759,7 @@ export default React.memo(function BeaconsTab({
 
               {/* Visitors — fills remaining height */}
               <div className="px-3 py-2 flex-1 min-h-0 flex flex-col overflow-hidden">
-                <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+                <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
                   Visitors ({visitors.length})
                 </div>
                 <div className="skeuo-inset p-1.5 flex-1 min-h-0 overflow-y-auto">
@@ -778,7 +778,7 @@ export default React.memo(function BeaconsTab({
                           <div className="text-[10px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
                             {v.profile?.displayName || v.userId.substring(0, 10) + "..."}
                           </div>
-                          <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
+                          <div className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>
                             First: {formatTs(v.firstVisit)} &middot; {v.proofCount} proof{v.proofCount !== 1 ? "s" : ""}
                           </div>
                         </div>
@@ -797,7 +797,7 @@ export default React.memo(function BeaconsTab({
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-2" style={{ color: "var(--text-tertiary)" }}>
             <span className="text-[11px]">Select a beacon to see details</span>
-            <span className="text-[9px]">Visitors and stats will appear here</span>
+            <span className="text-[10px]">Visitors and stats will appear here</span>
           </div>
         )}
       </div>

@@ -80,12 +80,44 @@ export interface ProcessedData {
   currentlyPresent: number;
   alreadyLeft: number;
   avgDwellMinutes: number;
+  peakConcurrent: number;
   beaconProofCounts: Record<string, number>;
   userBeaconTransitions: { from: string; to: string; count: number }[];
   checkInTimeline: { time: number; count: number; userIds: string[] }[];
   checkOutTimeline: { time: number; count: number; userIds: string[] }[];
+  presenceTimeline: { time: number; count: number }[];
   dwellTimes: { userId: string; minutes: number }[];
   userDetails: UserDetail[];
+}
+
+/** Compact per-user record shipped to the organizer dashboard. */
+export interface SummaryUser {
+  userId: string;
+  displayName: string;
+  profilePicture: string;
+  dwellMinutes: number;
+  proofCount: number;
+  firstProof: number;
+  lastProof: number;
+  status: "present" | "left";
+}
+
+/**
+ * Server-computed event summary — everything the organizer dashboard
+ * needs, at a fraction of the size of the raw analytics payload.
+ */
+export interface EventSummary {
+  event: EventData;
+  lastUpdate: number;
+  totalAttendees: number;
+  currentlyPresent: number;
+  avgDwellMinutes: number;
+  totalProofs: number;
+  uniqueBeacons: number;
+  peakConcurrent: number;
+  presenceTimeline: { time: number; count: number }[];
+  users: SummaryUser[];
+  organizers?: Record<string, OrganizerInfo>;
 }
 
 export interface UserDetail {
@@ -126,6 +158,12 @@ export interface OrganizerInfo {
 }
 
 export interface CrossEventAnalysis {
+  presenceCurves: {
+    eventId: string;
+    eventName: string;
+    /** Concurrent attendee count sampled at minutes-from-event-start. */
+    points: { minute: number; count: number }[];
+  }[];
   sharedUsers: {
     userId: string;
     eventIds: string[];

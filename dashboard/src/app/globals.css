@@ -1,183 +1,137 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-space-mono);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-space-mono);
 }
 
+/* ════════════════════════════════════════════════════════════════
+   biq Analytics V2 — modern dark design system
+   Components keep the legacy .skeuo-* class names; these classes
+   now render flat, layered "soft glass" cards instead of beveled
+   skeuomorphic panels.
+   ════════════════════════════════════════════════════════════════ */
+
 :root {
-  /* Surface palette — brushed dark metal */
-  --bg: #1a1a1e;
-  --bg-texture: linear-gradient(135deg, #1a1a1e 0%, #202024 50%, #18181c 100%);
-  --surface: #242428;
-  --surface-raised: #2c2c32;
-  --surface-inset: #141416;
-  --border-highlight: rgba(255, 255, 255, 0.1);
+  /* Surface palette — deep blue-black */
+  --bg: #0b0e14;
+  --bg-texture:
+    radial-gradient(1200px 600px at 80% -10%, rgba(0, 149, 255, 0.07), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(123, 94, 167, 0.05), transparent 55%),
+    #0b0e14;
+  --surface: #12161f;
+  --surface-raised: #1a1f2b;
+  --surface-inset: #0d1018;
+  --border-highlight: rgba(255, 255, 255, 0.08);
   --border-shadow: rgba(0, 0, 0, 0.6);
-  --border: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.07);
 
   /* Accent — logo blue */
   --accent: #0095FF;
-  --accent-dim: rgba(0, 149, 255, 0.15);
-  --accent-glow: rgba(0, 149, 255, 0.25);
+  --accent-dim: rgba(0, 149, 255, 0.14);
+  --accent-glow: rgba(0, 149, 255, 0.28);
 
   /* Text */
-  --text-primary: #e8e8ec;
-  --text-secondary: #9a9aa6;
-  --text-tertiary: #66666e;
+  --text-primary: #eef1f6;
+  --text-secondary: #9aa3b2;
+  --text-tertiary: #647084;
 
-  /* Semantic — from logo */
+  /* Semantic */
   --green: #00D4F5;
   --orange: #F7941D;
-  --red: #8CC63F;
+  --red: #f06050;
 
   /* Subtle overlays */
   --overlay-subtle: rgba(255, 255, 255, 0.04);
   --overlay-border: rgba(255, 255, 255, 0.06);
   --overlay-divider: rgba(255, 255, 255, 0.08);
-  --dot-inactive: #1a1a1e;
-  --header-bg: linear-gradient(180deg, #2e2e34 0%, #242428 60%, #202024 100%);
-  --header-border: rgba(0, 0, 0, 0.5);
-  --header-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
-  --selected-bg: linear-gradient(180deg, #363640 0%, #2a2a32 100%);
-  --selected-shadow: 1px 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
-  --btn-bg: linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%);
-  --btn-border: #4a4a52;
-  --tooltip-bg: linear-gradient(180deg, #2a2a30 0%, #222226 100%);
+  --dot-inactive: #1c2230;
+  --header-bg: rgba(15, 19, 27, 0.85);
+  --header-border: rgba(255, 255, 255, 0.06);
+  --header-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --selected-bg: linear-gradient(180deg, rgba(0, 149, 255, 0.14), rgba(0, 149, 255, 0.07));
+  --selected-shadow: inset 0 0 0 1px rgba(0, 149, 255, 0.25);
+  --btn-bg: rgba(255, 255, 255, 0.05);
+  --btn-border: rgba(255, 255, 255, 0.1);
+  --tooltip-bg: rgba(20, 25, 35, 0.96);
   --tooltip-border: rgba(255, 255, 255, 0.1);
-  --input-bg: #1a1a1e;
-  --input-border: #3a3a42;
-  --nav-bg: linear-gradient(180deg, #1e1e22 0%, #1a1a1e 100%);
-  --chart-tick: #66666e;
-  --chart-label: #9a9aa6;
-  --chart-text: #e8e8ec;
-  --icon-stroke: #e8e8ec;
-  --popover-bg: linear-gradient(180deg, #2e2e34 0%, #262628 100%);
-  --popover-border: #4a4a52;
-  --inset-bg: linear-gradient(180deg, #2a2a32 0%, #222228 100%);
+  --input-bg: #0d1018;
+  --input-border: rgba(255, 255, 255, 0.12);
+  --nav-bg: rgba(13, 16, 24, 0.9);
+  --chart-tick: #647084;
+  --chart-label: #9aa3b2;
+  --chart-text: #eef1f6;
+  --icon-stroke: #eef1f6;
+  --popover-bg: #161b26;
+  --popover-border: rgba(255, 255, 255, 0.12);
+  --inset-bg: rgba(0, 0, 0, 0.25);
 
-  /* Shadows for depth */
+  /* Shadows — soft, layered */
   --shadow-outset:
-    1px 1px 2px rgba(0,0,0,0.5),
-    -1px -1px 2px rgba(255,255,255,0.04),
-    0 4px 12px rgba(0,0,0,0.3);
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 10px 30px rgba(0, 0, 0, 0.35);
   --shadow-inset:
-    inset 1px 1px 3px rgba(0,0,0,0.5),
-    inset -1px -1px 2px rgba(255,255,255,0.03);
+    inset 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-pressed:
-    inset 2px 2px 4px rgba(0,0,0,0.6),
-    inset -1px -1px 2px rgba(255,255,255,0.02);
+    inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="light"] {
-  --bg: #e8e8ec;
-  --bg-texture: linear-gradient(135deg, #e8e8ec 0%, #f0f0f4 50%, #e4e4e8 100%);
-  --surface: #f0f0f4;
-  --surface-raised: #f8f8fc;
-  --surface-inset: #dcdce0;
-  --border-highlight: rgba(255, 255, 255, 0.6);
-  --border-shadow: rgba(0, 0, 0, 0.12);
-  --border: rgba(0, 0, 0, 0.1);
+  --bg: #f4f5f9;
+  --bg-texture:
+    radial-gradient(1200px 600px at 80% -10%, rgba(0, 149, 255, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(123, 94, 167, 0.06), transparent 55%),
+    #f4f5f9;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inset: #eceef4;
+  --border-highlight: rgba(255, 255, 255, 0.9);
+  --border-shadow: rgba(15, 23, 42, 0.1);
+  --border: rgba(15, 23, 42, 0.09);
 
   --accent: #0085e0;
-  --accent-dim: rgba(0, 133, 224, 0.12);
-  --accent-glow: rgba(0, 133, 224, 0.2);
+  --accent-dim: rgba(0, 133, 224, 0.1);
+  --accent-glow: rgba(0, 133, 224, 0.22);
 
-  --text-primary: #1a1a1e;
-  --text-secondary: #555560;
-  --text-tertiary: #888890;
+  --text-primary: #131722;
+  --text-secondary: #4b5567;
+  --text-tertiary: #8a93a6;
 
-  --green: #00a8c4;
+  --green: #009fc0;
   --orange: #d97a0a;
-  --red: #6fa030;
+  --red: #d8483a;
 
-  --overlay-subtle: rgba(0, 0, 0, 0.04);
-  --overlay-border: rgba(0, 0, 0, 0.08);
-  --overlay-divider: rgba(0, 0, 0, 0.1);
-  --dot-inactive: #d0d0d4;
-  --header-bg: linear-gradient(180deg, #f0f0f4 0%, #e8e8ec 60%, #e4e4e8 100%);
-  --header-border: rgba(0, 0, 0, 0.1);
-  --header-shadow: 0 2px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
-  --selected-bg: linear-gradient(180deg, #e0e0e8 0%, #d8d8e0 100%);
-  --selected-shadow: 1px 1px 2px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.6);
-  --btn-bg: linear-gradient(180deg, #f4f4f8 0%, #e8e8ec 60%, #e0e0e4 100%);
-  --btn-border: #c0c0c8;
-  --tooltip-bg: linear-gradient(180deg, #f8f8fc 0%, #f0f0f4 100%);
-  --tooltip-border: rgba(0, 0, 0, 0.12);
-  --input-bg: #e4e4e8;
-  --input-border: #c0c0c8;
-  --nav-bg: linear-gradient(180deg, #ececf0 0%, #e8e8ec 100%);
-  --chart-tick: #888890;
-  --chart-label: #555560;
-  --chart-text: #1a1a1e;
-  --icon-stroke: #1a1a1e;
-  --popover-bg: linear-gradient(180deg, #f0f0f4 0%, #eaeaee 100%);
-  --popover-border: #c0c0c8;
-  --inset-bg: linear-gradient(180deg, #e0e0e4 0%, #d8d8dc 100%);
+  --overlay-subtle: rgba(15, 23, 42, 0.04);
+  --overlay-border: rgba(15, 23, 42, 0.07);
+  --overlay-divider: rgba(15, 23, 42, 0.1);
+  --dot-inactive: #dde1ea;
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(15, 23, 42, 0.08);
+  --header-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --selected-bg: linear-gradient(180deg, rgba(0, 133, 224, 0.12), rgba(0, 133, 224, 0.06));
+  --selected-shadow: inset 0 0 0 1px rgba(0, 133, 224, 0.3);
+  --btn-bg: rgba(15, 23, 42, 0.04);
+  --btn-border: rgba(15, 23, 42, 0.12);
+  --tooltip-bg: rgba(255, 255, 255, 0.98);
+  --tooltip-border: rgba(15, 23, 42, 0.12);
+  --input-bg: #ffffff;
+  --input-border: rgba(15, 23, 42, 0.15);
+  --nav-bg: rgba(255, 255, 255, 0.9);
+  --chart-tick: #8a93a6;
+  --chart-label: #4b5567;
+  --chart-text: #131722;
+  --icon-stroke: #131722;
+  --popover-bg: #ffffff;
+  --popover-border: rgba(15, 23, 42, 0.15);
+  --inset-bg: rgba(15, 23, 42, 0.04);
 
   --shadow-outset:
-    1px 1px 3px rgba(0,0,0,0.08),
-    -1px -1px 2px rgba(255,255,255,0.7),
-    0 4px 12px rgba(0,0,0,0.06);
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 30px rgba(15, 23, 42, 0.07);
   --shadow-inset:
-    inset 1px 1px 3px rgba(0,0,0,0.08),
-    inset -1px -1px 2px rgba(255,255,255,0.5);
+    inset 0 1px 3px rgba(15, 23, 42, 0.08);
   --shadow-pressed:
-    inset 2px 2px 4px rgba(0,0,0,0.12),
-    inset -1px -1px 2px rgba(255,255,255,0.4);
-}
-
-[data-theme="light"] .skeuo-panel {
-  background: linear-gradient(180deg, #f8f8fc 0%, #f0f0f4 100%);
-  border: 1px solid #c8c8d0;
-}
-
-[data-theme="light"] .skeuo-inset {
-  background: linear-gradient(180deg, #dcdce0 0%, #e4e4e8 100%);
-  border: 1px solid #c0c0c8;
-}
-
-[data-theme="light"] .skeuo-btn {
-  background: linear-gradient(180deg, #f4f4f8 0%, #e8e8ec 60%, #e0e0e4 100%);
-  border: 1px solid #c0c0c8;
-  box-shadow:
-    1px 1px 2px rgba(0,0,0,0.06),
-    -1px -1px 1px rgba(255,255,255,0.8),
-    inset 0 1px 0 rgba(255,255,255,0.6);
-}
-[data-theme="light"] .skeuo-btn:active {
-  background: linear-gradient(180deg, #d8d8dc 0%, #e4e4e8 100%);
-}
-
-[data-theme="light"] .skeuo-input {
-  background: linear-gradient(180deg, #e0e0e4 0%, #e8e8ec 100%);
-  border: 1px solid #c0c0c8;
-  color: var(--text-primary);
-}
-
-[data-theme="light"] .skeuo-tab-group {
-  background: linear-gradient(180deg, #dcdce0 0%, #e4e4e8 100%);
-  border: 1px solid #c0c0c8;
-}
-
-[data-theme="light"] ::-webkit-scrollbar-track {
-  background: #e0e0e4;
-}
-[data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #c0c0c8 0%, #b0b0b8 100%);
-  border: 1px solid rgba(0,0,0,0.1);
-}
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #b0b0b8 0%, #a0a0a8 100%);
-}
-
-[data-theme="light"] .glass {
-  background: linear-gradient(180deg, #f8f8fc 0%, #f0f0f4 100%);
-  border: 1px solid #c8c8d0;
-}
-
-[data-theme="light"] body::before {
-  opacity: 0.015;
+    inset 0 2px 4px rgba(15, 23, 42, 0.12);
 }
 
 *:focus {
@@ -186,9 +140,7 @@
 }
 .skeuo-input:focus {
   border-color: var(--accent);
-  box-shadow:
-    inset 1px 1px 3px rgba(0,0,0,0.5),
-    0 0 0 2px var(--accent-dim) !important;
+  box-shadow: 0 0 0 3px var(--accent-dim) !important;
 }
 
 html, body {
@@ -196,131 +148,98 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text-primary);
-  font-family: var(--font-space-mono), 'Courier New', monospace;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
 }
 
-/* Noise texture overlay via pseudo-element on body */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-size: 256px 256px;
-}
-
-/* ── Skeuomorphic panel — raised, beveled ── */
+/* ── Card — flat, layered, soft border ── */
 .skeuo-panel {
-  background: linear-gradient(180deg, #2a2a30 0%, #242428 100%);
-  border: 1px solid #4a4a52;
-  border-radius: 10px;
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 14px;
   box-shadow: var(--shadow-outset);
 }
 
-/* ── Inset well — sunken area ── */
+/* ── Inset well — quiet recessed area (chart background) ── */
 .skeuo-inset {
-  background: linear-gradient(180deg, #141416 0%, #1a1a1e 100%);
-  border: 1px solid #3a3a42;
-  border-radius: 8px;
-  box-shadow: var(--shadow-inset);
+  background: var(--inset-bg);
+  border: 1px solid var(--overlay-border);
+  border-radius: 10px;
 }
 
-/* ── Raised button ── */
+/* ── Button ── */
 .skeuo-btn {
-  background: linear-gradient(180deg, #363640 0%, #2a2a32 60%, #242428 100%);
-  border: 1px solid #4a4a52;
-  border-radius: 6px;
-  box-shadow:
-    1px 1px 2px rgba(0,0,0,0.4),
-    -1px -1px 1px rgba(255,255,255,0.04),
-    inset 0 1px 0 rgba(255,255,255,0.08);
-  transition: all 0.1s ease;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+}
+.skeuo-btn:hover {
+  background: var(--overlay-divider);
+  border-color: var(--popover-border);
 }
 .skeuo-btn:active {
-  background: linear-gradient(180deg, #222228 0%, #2a2a32 100%);
-  box-shadow: var(--shadow-pressed);
   transform: translateY(1px);
 }
 
 /* ── Accent button ── */
 .skeuo-btn-accent {
-  background: linear-gradient(180deg, #1aabff 0%, #0095FF 60%, #0080dd 100%);
-  border: 1px solid #4a4a52;
-  border-radius: 6px;
-  box-shadow:
-    1px 1px 2px rgba(0,0,0,0.4),
-    -1px -1px 1px rgba(255,255,255,0.1),
-    inset 0 1px 0 rgba(255,255,255,0.2);
+  background: linear-gradient(180deg, #1aa5ff, #0085e8);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px var(--accent-glow);
   color: white;
-  transition: all 0.1s ease;
+  transition: filter 0.12s ease, transform 0.06s ease;
 }
-.skeuo-btn-accent:active {
-  background: linear-gradient(180deg, #0080dd 0%, #0095FF 100%);
-  box-shadow: var(--shadow-pressed);
-  transform: translateY(1px);
-}
+.skeuo-btn-accent:hover { filter: brightness(1.08); }
+.skeuo-btn-accent:active { transform: translateY(1px); }
 
-/* ── Input field — inset ── */
+/* ── Input field ── */
 .skeuo-input {
-  background: linear-gradient(180deg, #121214 0%, #18181c 100%);
-  border: 1px solid #3a3a42;
-  border-radius: 6px;
-  box-shadow:
-    inset 1px 1px 3px rgba(0,0,0,0.5),
-    inset 0 0 0 1px rgba(0,0,0,0.2);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
   color: var(--text-primary);
-  font-family: var(--font-space-mono), monospace;
+  transition: border-color 0.12s ease;
 }
 .skeuo-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow:
-    inset 1px 1px 3px rgba(0,0,0,0.5),
-    0 0 0 2px var(--accent-dim);
 }
 
 /* ── Indicator LED ── */
 .skeuo-led {
   border-radius: 50%;
-  box-shadow:
-    inset 0 1px 2px rgba(0,0,0,0.4),
-    0 0 6px currentColor;
+  box-shadow: 0 0 8px currentColor;
 }
 
-/* ── Tab pill — toggle style ── */
+/* ── Tab pill group ── */
 .skeuo-tab-group {
-  background: linear-gradient(180deg, #141416 0%, #1a1a1e 100%);
-  border: 1px solid #3a3a42;
-  border-radius: 8px;
-  box-shadow: var(--shadow-inset);
+  background: var(--inset-bg);
+  border: 1px solid var(--overlay-border);
+  border-radius: 10px;
   padding: 3px;
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track {
-  background: var(--surface-inset);
-  border-radius: 3px;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #444 0%, #333 100%);
-  border-radius: 3px;
-  border: 1px solid rgba(0,0,0,0.3);
+  background: var(--overlay-divider);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #555 0%, #444 100%);
+  background: var(--text-tertiary);
 }
 
 /* ── Recharts grid ── */
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: rgba(255, 255, 255, 0.04) !important;
+  stroke: var(--overlay-subtle) !important;
 }
 
-/* Remove focus outlines on recharts elements */
 .recharts-surface:focus,
 .recharts-wrapper:focus,
 .recharts-surface:focus-visible,
@@ -328,11 +247,11 @@ body::before {
   outline: none !important;
 }
 
-/* ── Legacy glass compat — redirect to skeuo-panel ── */
+/* ── Legacy glass compat — same card style ── */
 .glass {
-  background: linear-gradient(180deg, #2a2a30 0%, #242428 100%);
-  border: 1px solid #4a4a52;
-  border-radius: 10px;
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 14px;
   box-shadow: var(--shadow-outset);
 }
 
@@ -342,4 +261,3 @@ body::before {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const res = await fetch(url, {
       headers: { Authorization: AUTH_TOKEN },
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
 
     if (!res.ok) {
@@ -26,7 +26,9 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+    });
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch events" },

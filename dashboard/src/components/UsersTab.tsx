@@ -91,7 +91,7 @@ function UserRow({ user, isSelected, onSelect, lumaGuest }: {
             </span>
           )}
         </div>
-        <div className="text-[8px]" style={{ color: "var(--text-tertiary)" }}>
+        <div className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>
           {formatTime(user.firstProof)}
         </div>
       </div>
@@ -114,7 +114,7 @@ function UserColumn({ title, count, color, icon, users, selectedUserId, onSelect
         <span style={{ fontSize: "12px" }}>{icon}</span>
         <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{title}</span>
         <span
-          className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+          className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md"
           style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}
         >
           {count}
@@ -123,7 +123,7 @@ function UserColumn({ title, count, color, icon, users, selectedUserId, onSelect
       <div className="flex-1 overflow-y-auto m-1.5 skeuo-inset">
         <div className="p-1 space-y-0.5">
           {users.length === 0 ? (
-            <div className="text-[9px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>No users</div>
+            <div className="text-[10px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>No users</div>
           ) : (
             users.map((u) => (
               <UserRow
@@ -164,14 +164,14 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
           <div className="text-[12px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
             {user.profile?.displayName || user.userId}
           </div>
-          <div className="text-[9px] truncate" style={{ color: "var(--text-tertiary)" }}>
+          <div className="text-[10px] truncate" style={{ color: "var(--text-tertiary)" }}>
             {user.userId}
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {lumaGuest && (
             <span
-              className="px-2 py-0.5 rounded-md text-[8px] font-bold"
+              className="px-2 py-0.5 rounded-md text-[9px] font-bold"
               style={{
                 background: "linear-gradient(180deg, #a855f722 0%, #a855f711 100%)",
                 color: "#a855f7",
@@ -183,7 +183,7 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
             </span>
           )}
           <span
-            className="px-2 py-0.5 rounded-md text-[8px] font-bold"
+            className="px-2 py-0.5 rounded-md text-[9px] font-bold"
             style={{
               background: user.status === "present"
                 ? "linear-gradient(180deg, #8CC63F22 0%, #8CC63F11 100%)"
@@ -209,7 +209,7 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
           { label: "Proofs", value: String(user.proofCount) },
         ].map((s) => (
           <div key={s.label} className="skeuo-inset px-2 py-1.5 rounded-md">
-            <div className="text-[8px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
+            <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>{s.label}</div>
             <div className="text-[10px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{s.value}</div>
           </div>
         ))}
@@ -217,7 +217,7 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
 
       {/* Timeline */}
       <div className="flex-1 overflow-hidden flex flex-col px-3 py-2">
-        <div className="text-[8px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>Timeline</div>
+        <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-tertiary)" }}>Timeline</div>
         <div className="flex-1 overflow-y-auto skeuo-inset p-1.5">
           <div className="space-y-0.5">
             {user.beaconTimeline.map((entry, i) => {
@@ -241,14 +241,14 @@ export function UserDetailPanel({ user, beacons, beaconNames, onTimeClick, lumaG
                       boxShadow: isTransition ? "0 0 4px var(--text-tertiary)" : "none",
                     }}
                   />
-                  <span className="text-[8px] w-28 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+                  <span className="text-[9px] w-28 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
                     {formatTs(entry.time)}
                   </span>
                   <span className="text-[10px] font-bold" style={{ color: "var(--text-primary)" }}>
                     {getBeaconDisplayName(entry.beaconId, beacons, beaconNames)}
                   </span>
                   {isTransition && (
-                    <span className="text-[8px] ml-auto font-bold" style={{ color: "var(--text-tertiary)" }}>moved</span>
+                    <span className="text-[9px] ml-auto font-bold" style={{ color: "var(--text-tertiary)" }}>moved</span>
                   )}
                 </div>
               );
@@ -313,7 +313,7 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
           <button
             key={t.key}
             onClick={() => setFilter(t.key)}
-            className="px-2 py-0.5 rounded-md text-[9px] font-bold transition-all"
+            className="px-2 py-0.5 rounded-md text-[10px] font-bold transition-all"
             style={{
               background: filter === t.key ? "var(--selected-bg)" : "transparent",
               color: filter === t.key ? t.color : "var(--text-tertiary)",
@@ -339,7 +339,7 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
               }}
             />
           </div>
-          <span className="text-[8px] font-bold" style={{ color: "#a855f7" }}>
+          <span className="text-[9px] font-bold" style={{ color: "#a855f7" }}>
             {lumaCount}/{Object.keys(lumaGuests).length}
           </span>
         </div>
@@ -348,7 +348,7 @@ export default React.memo(function UsersTab({ users, selectedUserId, onSelectUse
       <div className="flex-1 overflow-y-auto m-1.5 skeuo-inset">
         <div className="p-1 space-y-0.5">
           {filtered.length === 0 ? (
-            <div className="text-[9px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>No users</div>
+            <div className="text-[10px] text-center py-4" style={{ color: "var(--text-tertiary)" }}>No users</div>
           ) : (
             filtered.map((u) => (
               <UserRow

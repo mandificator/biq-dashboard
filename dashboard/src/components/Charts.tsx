@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -234,6 +237,209 @@ function MiniAvatar({ src, name, size = 20 }: { src?: string; name: string; size
 }
 
 
+/* ═══ Presence (occupancy) chart — how many people are in the room over time ═══ */
+export const PresenceChart = React.memo(function PresenceChart({
+  data, peak,
+}: {
+  data: { time: number; count: number }[];
+  peak: number;
+}) {
+  const [isFs, setIsFs] = useState(false);
+  const chartData = useMemo(() => data.map((d) => ({
+    time: formatLabel(d.time),
+    value: d.count,
+  })), [data]);
+
+  const renderChart = (fs: boolean) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
+        <defs>
+          <linearGradient id={fs ? "prGradFs" : "prGrad"} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00D4F5" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#00D4F5" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="time" tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+        <YAxis tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+        <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
+          if (!active || !payload?.length) return null;
+          const pt = payload[0].payload as { time: string; value: number };
+          return (
+            <div style={tooltipContentStyle}>
+              <div style={{ color: "var(--chart-label)", fontSize: 10, marginBottom: 2 }}>{pt.time}</div>
+              <div style={{ color: "#00D4F5", fontSize: 13, fontWeight: 700 }}>{pt.value} present</div>
+            </div>
+          );
+        }} />
+        <Area type="monotone" dataKey="value" name="Present" stroke="#00D4F5" fill={`url(#${fs ? "prGradFs" : "prGrad"})`} strokeWidth={2}
+          dot={false} isAnimationActive={false} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+
+  return (
+    <div className="skeuo-panel h-full flex flex-col overflow-hidden relative">
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+          Live Occupancy <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>— concurrent attendees</span>
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold" style={{ color: "#00D4F5" }}>peak {peak}</span>
+          <ExpandButton onClick={() => setIsFs(true)} />
+        </div>
+      </div>
+      {isFs && <FullscreenChartModal title="Live Occupancy" onClose={() => setIsFs(false)}>{renderChart(true)}</FullscreenChartModal>}
+      <div className="flex-1 min-h-0 mx-3 mb-3 skeuo-inset overflow-hidden">
+        {renderChart(false)}
+      </div>
+    </div>
+  );
+});
+
+/* ═══ Dwell time distribution histogram ═══ */
+const DWELL_BUCKETS = [
+  { label: "<15m", min: 0, max: 15 },
+  { label: "15-30m", min: 15, max: 30 },
+  { label: "30m-1h", min: 30, max: 60 },
+  { label: "1-2h", min: 60, max: 120 },
+  { label: "2-4h", min: 120, max: 240 },
+  { label: "4h+", min: 240, max: Infinity },
+];
+
+export const DwellHistogram = React.memo(function DwellHistogram({
+  data,
+}: {
+  data: DwellPoint[];
+}) {
+  const [isFs, setIsFs] = useState(false);
+  const chartData = useMemo(() => DWELL_BUCKETS.map((b) => ({
+    label: b.label,
+    value: data.filter((d) => d.minutes >= b.min && d.minutes < b.max).length,
+  })), [data]);
+
+  const maxIdx = useMemo(() => {
+    let idx = 0;
+    chartData.forEach((d, i) => { if (d.value > chartData[idx].value) idx = i; });
+    return idx;
+  }, [chartData]);
+
+  const renderChart = (fs: boolean) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
+        <XAxis dataKey="label" tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} interval={0} />
+        <YAxis tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+        <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} content={({ active, payload }) => {
+          if (!active || !payload?.length) return null;
+          const pt = payload[0].payload as { label: string; value: number };
+          return (
+            <div style={tooltipContentStyle}>
+              <div style={{ color: "var(--chart-label)", fontSize: 10, marginBottom: 2 }}>{pt.label}</div>
+              <div style={{ color: "#8CC63F", fontSize: 13, fontWeight: 700 }}>{pt.value} attendees</div>
+            </div>
+          );
+        }} />
+        <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+          {chartData.map((_, i) => (
+            <Cell key={i} fill="#8CC63F" fillOpacity={i === maxIdx ? 0.95 : 0.5} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
+  return (
+    <div className="skeuo-panel h-full flex flex-col overflow-hidden relative">
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+          Dwell Distribution
+        </span>
+        <ExpandButton onClick={() => setIsFs(true)} />
+      </div>
+      {isFs && <FullscreenChartModal title="Dwell Distribution" onClose={() => setIsFs(false)}>{renderChart(true)}</FullscreenChartModal>}
+      <div className="flex-1 min-h-0 mx-3 mb-3 skeuo-inset overflow-hidden">
+        {renderChart(false)}
+      </div>
+    </div>
+  );
+});
+
+/* ═══ Retention curve — % of attendees still present N minutes in ═══ */
+export const RetentionChart = React.memo(function RetentionChart({
+  data,
+}: {
+  data: DwellPoint[];
+}) {
+  const [isFs, setIsFs] = useState(false);
+
+  const chartData = useMemo(() => {
+    if (data.length === 0) return [];
+    const total = data.length;
+    const maxDwell = Math.max(...data.map((d) => d.minutes));
+    // Sample every 10 minutes up to the longest stay (cap at 100 points)
+    const step = Math.max(10, Math.ceil(maxDwell / 100 / 10) * 10);
+    const points: { minute: number; pct: number }[] = [];
+    for (let t = 0; t <= maxDwell; t += step) {
+      const remaining = data.filter((d) => d.minutes >= t).length;
+      points.push({ minute: t, pct: Math.round((remaining / total) * 100) });
+    }
+    return points;
+  }, [data]);
+
+  const halfLife = useMemo(() => {
+    const pt = chartData.find((p) => p.pct <= 50);
+    return pt ? pt.minute : null;
+  }, [chartData]);
+
+  const renderChart = (fs: boolean) => (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chartData} margin={{ top: 10, right: 12, bottom: 4, left: fs ? 0 : -16 }}>
+        <defs>
+          <linearGradient id={fs ? "rtGradFs" : "rtGrad"} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#7B5EA7" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#7B5EA7" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="minute" tickFormatter={(m) => formatDur(Number(m))} tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+        <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fill: "var(--chart-tick)", fontSize: fs ? 12 : 10 }} axisLine={false} tickLine={false} />
+        <Tooltip cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }} content={({ active, payload }) => {
+          if (!active || !payload?.length) return null;
+          const pt = payload[0].payload as { minute: number; pct: number };
+          return (
+            <div style={tooltipContentStyle}>
+              <div style={{ color: "var(--chart-label)", fontSize: 10, marginBottom: 2 }}>after {formatDur(pt.minute)}</div>
+              <div style={{ color: "#7B5EA7", fontSize: 13, fontWeight: 700 }}>{pt.pct}% still present</div>
+            </div>
+          );
+        }} />
+        <Area type="stepAfter" dataKey="pct" name="Retention" stroke="#7B5EA7" fill={`url(#${fs ? "rtGradFs" : "rtGrad"})`} strokeWidth={2}
+          dot={false} isAnimationActive={false} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+
+  return (
+    <div className="skeuo-panel h-full flex flex-col overflow-hidden relative">
+      <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+          Retention
+        </span>
+        <div className="flex items-center gap-2">
+          {halfLife !== null && (
+            <span className="text-[10px] font-bold" style={{ color: "#7B5EA7" }} title="Time by which half the audience has left">
+              ½ at {formatDur(halfLife)}
+            </span>
+          )}
+          <ExpandButton onClick={() => setIsFs(true)} />
+        </div>
+      </div>
+      {isFs && <FullscreenChartModal title="Retention" onClose={() => setIsFs(false)}>{renderChart(true)}</FullscreenChartModal>}
+      <div className="flex-1 min-h-0 mx-3 mb-3 skeuo-inset overflow-hidden">
+        {renderChart(false)}
+      </div>
+    </div>
+  );
+});
+
 export const CheckInChart = React.memo(function CheckInChart({
   data, profiles, onClickUser,
 }: {
@@ -296,7 +502,7 @@ export const CheckInChart = React.memo(function CheckInChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative" ref={containerRef}>
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
           Check-ins
         </span>
         <ExpandButton onClick={() => setIsFs(true)} />
@@ -372,7 +578,7 @@ export const CheckOutChart = React.memo(function CheckOutChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden relative" ref={containerRef}>
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
           Check-outs
         </span>
         <ExpandButton onClick={() => setIsFs(true)} />
@@ -424,7 +630,7 @@ export const DwellTimeChart = React.memo(function DwellTimeChart({
                 <span className={`${fs ? "text-[13px]" : "text-[10px]"} font-bold truncate`} style={{ color: "var(--text-primary)", maxWidth: "60%" }}>
                   {name}
                 </span>
-                <span className={`${fs ? "text-[12px]" : "text-[9px]"} font-bold flex-shrink-0`} style={{ color: "#8CC63F" }}>
+                <span className={`${fs ? "text-[12px]" : "text-[10px]"} font-bold flex-shrink-0`} style={{ color: "#8CC63F" }}>
                   {formatDur(d.minutes)}
                 </span>
               </div>
@@ -444,7 +650,7 @@ export const DwellTimeChart = React.memo(function DwellTimeChart({
   const sortButton = (
     <button
       onClick={() => setSortAsc(!sortAsc)}
-      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors"
+      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors"
       style={{ color: "var(--text-tertiary)", background: "rgba(255,255,255,0.04)" }}
       title={sortAsc ? "Ascending — click to sort descending" : "Descending — click to sort ascending"}
     >
@@ -464,7 +670,7 @@ export const DwellTimeChart = React.memo(function DwellTimeChart({
   return (
     <div className="skeuo-panel h-full flex flex-col overflow-hidden">
       <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
           Dwell Time
         </span>
         <div className="flex items-center gap-1.5">

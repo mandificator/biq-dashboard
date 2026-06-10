@@ -5,11 +5,9 @@ import { useParams } from "next/navigation";
 import {
   EventListItem,
   OrganizerInfo,
-  AnalyticsResponse,
-  ProcessedData,
+  EventSummary,
   CrossEventAnalysis,
 } from "@/types";
-import { processAnalytics } from "@/lib/processData";
 import { analyzeCrossEvents } from "@/lib/crossEventAnalysis";
 import EventCard from "@/components/organizer/EventCard";
 import LiveDashboard from "@/components/organizer/LiveDashboard";
@@ -39,7 +37,7 @@ export default function OrganizerDashboard() {
     if (savedEventIds) try { return new Set(JSON.parse(savedEventIds)); } catch { /* ignore */ }
     return new Set();
   });
-  const [loadedData, setLoadedData] = useState<Map<string, ProcessedData>>(new Map());
+  const [loadedData, setLoadedData] = useState<Map<string, EventSummary>>(new Map());
   const [loadingEventIds, setLoadingEventIds] = useState<Set<string>>(new Set());
 
   // Refs for stable fetch deduplication
@@ -59,16 +57,16 @@ export default function OrganizerDashboard() {
         const sorted = events.sort((a, b) => b.startTime - a.startTime);
         setOrgEvents(sorted);
 
-        // Fetch org info from the first event's analytics
+        // Fetch org info from the first event's summary (compact payload)
         if (sorted.length > 0) {
-          const aRes = await fetch(`/api/analytics?eventId=${sorted[0].id}`);
+          const aRes = await fetch(`/api/summary?eventId=${sorted[0].id}`);
           if (aRes.ok) {
-            const aData = await aRes.json() as AnalyticsResponse & { organizers?: Record<string, OrganizerInfo> };
-            if (aData.organizers?.[orgId]) {
-              setOrgInfo({ ...aData.organizers[orgId], id: orgId });
+            const summary = await aRes.json() as EventSummary;
+            if (summary.organizers?.[orgId]) {
+              setOrgInfo({ ...summary.organizers[orgId], id: orgId });
             }
-            // Also cache this first event's processed data
-            setLoadedData((prev) => new Map(prev).set(sorted[0].id, processAnalytics(aData)));
+            // Also cache this first event's summary
+            setLoadedData((prev) => new Map(prev).set(sorted[0].id, summary));
           }
         }
 
@@ -105,10 +103,10 @@ export default function OrganizerDashboard() {
   const fetchEventAnalytics = useCallback((eventId: string) => {
     if (loadedRef.current.has(eventId) || loadingRef.current.has(eventId)) return;
     setLoadingEventIds((ls) => new Set(ls).add(eventId));
-    fetch(`/api/analytics?eventId=${eventId}`)
+    fetch(`/api/summary?eventId=${eventId}`)
       .then((res) => res.json())
-      .then((data: AnalyticsResponse) => {
-        setLoadedData((prev) => new Map(prev).set(eventId, processAnalytics(data)));
+      .then((data: EventSummary) => {
+        setLoadedData((prev) => new Map(prev).set(eventId, data));
       })
       .catch((err) => console.error("Failed to load analytics for", eventId, err))
       .finally(() => {
@@ -160,13 +158,13 @@ export default function OrganizerDashboard() {
   const aggStats = useMemo(() => {
     const datasets = Array.from(selectedEventIds)
       .map((eid) => loadedData.get(eid))
-      .filter(Boolean) as ProcessedData[];
+      .filter(Boolean) as EventSummary[];
     if (datasets.length === 0) return null;
     const allUserIds = new Set<string>();
     let totalDwell = 0, totalProofs = 0, userCount = 0;
     for (const d of datasets) {
-      for (const u of d.userDetails) { allUserIds.add(u.userId); totalDwell += u.dwellMinutes; userCount++; }
-      totalProofs += d.proofs.length;
+      for (const u of d.users) { allUserIds.add(u.userId); totalDwell += u.dwellMinutes; userCount++; }
+      totalProofs += d.totalProofs;
     }
     return { uniqueUsers: allUserIds.size, avgDwell: userCount > 0 ? Math.round(totalDwell / userCount) : 0, totalProofs };
   }, [selectedEventIds, loadedData]);
@@ -247,17 +245,17 @@ export default function OrganizerDashboard() {
           <div className="w-[260px] flex-shrink-0 flex flex-col skeuo-panel overflow-hidden">
             {/* Select all / clear */}
             <div className="flex items-center gap-1.5 px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--overlay-border)" }}>
-              <span className="text-[9px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
+              <span className="text-[11px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
                 Events ({orgEvents.length})
               </span>
               <button onClick={selectedCount === orgEvents.length && selectedCount > 0 ? deselectAll : selectAll}
-                className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+                className="text-[11px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
                 style={{ color: "var(--text-secondary)" }}>
                 {selectedCount === orgEvents.length && selectedCount > 0 ? "None" : "All"}
               </button>
               {selectedCount > 0 && selectedCount !== orgEvents.length && (
                 <button onClick={deselectAll}
-                  className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+                  className="text-[11px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
                   style={{ color: "var(--text-tertiary)" }}>
                   Clear
                 </button>
@@ -299,7 +297,7 @@ export default function OrganizerDashboard() {
                       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                     </svg>
                     <span className="text-[12px]">Select events to see analytics</span>
-                    <span className="text-[9px]" style={{ color: "var(--text-tertiary)", opacity: 0.6 }}>
+                    <span className="text-[11px]" style={{ color: "var(--text-tertiary)", opacity: 0.6 }}>
                       Pick 2 or more from the sidebar
                     </span>
                   </>
@@ -331,7 +329,7 @@ function HeaderStat({ label, value, color }: { label: string; value: string | nu
   return (
     <div className="flex items-center gap-1.5">
       <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      <span className="text-[9px] font-bold uppercase" style={{ color: "var(--text-tertiary)" }}>{label}</span>
+      <span className="text-[11px] font-bold uppercase" style={{ color: "var(--text-tertiary)" }}>{label}</span>
       <span className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>{value}</span>
     </div>
   );

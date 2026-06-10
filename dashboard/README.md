@@ -1,6 +1,12 @@
-# biq Analytics Dashboard
+# biq Analytics Dashboard (V2)
 
 Real-time event analytics dashboard for [biq](https://app.biq.me). Built with Next.js 16, React 19, Recharts, and Tailwind CSS 4.
+
+## What's new in V2
+
+- **Fast loading** — new `/api/summary` endpoint processes analytics server-side and ships a compact summary (~5-20KB instead of 0.1-1.3MB per event). All API routes are CDN-cached (`s-maxage` + `stale-while-revalidate`; past events cached for 1h+). Heavy components (Recharts, beacon map) are lazy-loaded via `next/dynamic`.
+- **New attendance charts** — Live Occupancy (concurrent attendees over time), Dwell Distribution histogram, Retention curve (% still present after N minutes, with audience half-life), and a cross-event Attendance Flow comparison aligned to event start.
+- **Modern design system** — flat layered cards, Inter typeface, larger readable text, refreshed dark/light themes. Legacy `.skeuo-*` class names are kept but restyled.
 
 ## Quick Start
 
@@ -74,7 +80,8 @@ Both routes proxy to `https://app.biq.me/api/v0/` with `Bearer r0b0_analytics` a
 
 | Route | Params | Description |
 |-------|--------|-------------|
-| `GET /api/analytics` | `eventId` (required), `since` (optional) | Event analytics data |
+| `GET /api/analytics` | `eventId` (required), `since` (optional) | Full event analytics data (used by the event detail page) |
+| `GET /api/summary` | `eventId` (required) | Server-computed compact summary (used by the organizer dashboard) |
 | `GET /api/events` | `organizerId` (optional) | List events |
 
 ## Data Processing

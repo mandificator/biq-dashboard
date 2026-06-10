@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   EventListItem,
   OrganizerInfo,
-  AnalyticsResponse,
+  EventSummary,
 } from "@/types";
 
 const ACCESS_PASSWORD = "biqP455";
@@ -74,11 +74,11 @@ export default function OrganizerIndex() {
         const uniqueEventIds = [...new Set(Object.values(orgFirstEvent))];
         await Promise.allSettled(
           uniqueEventIds.map((eventId) =>
-            fetch(`/api/analytics?eventId=${eventId}`)
+            fetch(`/api/summary?eventId=${eventId}`)
               .then((r) => r.ok ? r.json() : null)
-              .then((aData: (AnalyticsResponse & { organizers?: Record<string, OrganizerInfo> }) | null) => {
-                if (aData?.organizers) {
-                  for (const [id, info] of Object.entries(aData.organizers)) {
+              .then((summary: EventSummary | null) => {
+                if (summary?.organizers) {
+                  for (const [id, info] of Object.entries(summary.organizers)) {
                     if (!infoMap[id]) infoMap[id] = { ...info, id };
                   }
                 }
@@ -103,7 +103,7 @@ export default function OrganizerIndex() {
         <div className="skeuo-panel p-6 flex flex-col items-center gap-4" style={{ width: 300 }}>
           <img src="/logo_biq.png" alt="biq" className="w-10 h-10 object-cover rounded"
             style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }} />
-          <span className="text-[11px] font-bold" style={{ color: "var(--text-secondary)" }}>Admin Access</span>
+          <span className="text-[12px] font-bold" style={{ color: "var(--text-secondary)" }}>Admin Access</span>
           <input
             type="password"
             value={password}
@@ -114,9 +114,9 @@ export default function OrganizerIndex() {
             autoFocus
           />
           {authError && (
-            <span className="text-[10px]" style={{ color: "var(--red)" }}>Wrong password</span>
+            <span className="text-[12px]" style={{ color: "var(--red)" }}>Wrong password</span>
           )}
-          <button onClick={handleLogin} className="skeuo-btn px-4 py-1.5 text-[11px] font-bold w-full">
+          <button onClick={handleLogin} className="skeuo-btn px-4 py-1.5 text-[12px] font-bold w-full">
             Enter
           </button>
         </div>
@@ -134,7 +134,7 @@ export default function OrganizerIndex() {
           boxShadow: "0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
         }}
       >
-        <span className="text-[11px] font-bold" style={{ color: "var(--text-secondary)" }}>
+        <span className="text-[12px] font-bold" style={{ color: "var(--text-secondary)" }}>
           Select Organizer
         </span>
       </header>
@@ -146,7 +146,7 @@ export default function OrganizerIndex() {
       )}
 
       {error && (
-        <div className="skeuo-panel p-3 text-[11px] m-3" style={{ color: "var(--red)" }}>{error}</div>
+        <div className="skeuo-panel p-3 text-[12px] m-3" style={{ color: "var(--red)" }}>{error}</div>
       )}
 
       {!loading && !error && orgList.length === 0 && (
@@ -181,7 +181,7 @@ export default function OrganizerIndex() {
                 <div className="min-w-0">
                   <div className="text-[12px] font-bold truncate" style={{ color: "var(--text-primary)" }}>{org.name}</div>
                   {org.description && (
-                    <div className="text-[10px] truncate mt-0.5" style={{ color: "var(--text-tertiary)" }}>{org.description}</div>
+                    <div className="text-[12px] truncate mt-0.5" style={{ color: "var(--text-tertiary)" }}>{org.description}</div>
                   )}
                 </div>
               </button>

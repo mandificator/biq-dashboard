@@ -82,6 +82,20 @@ export function processAnalytics(data: AnalyticsResponse): ProcessedData {
   const checkInTimeline = bucketByInterval(checkInEntries);
   const checkOutTimeline = bucketByInterval(checkOutEntries);
 
+  // Presence timeline: how many users are concurrently present in each
+  // 10-min bucket. A user counts as present from their first proof through
+  // their last proof (inclusive of both buckets). For ongoing events, users
+  // seen within the presence threshold extend to "now".
+  const presenceTimeline = buildPresenceTimeline(
+    Object.values(userProofs).map((ups) => {
+      const first = ups[0].time;
+      let last = ups[ups.length - 1].time;
+      if (!isEventOver && now - last < PRESENCE_THRESHOLD) last = now;
+      return { first, last };
+    })
+  );
+  const peakConcurrent = presenceTimeline.reduce((m, b) => Math.max(m, b.count), 0);
+
   // Dwell times
   const dwellTimes = Object.keys(userProofs).map((uid) => {
     const ups = userProofs[uid];
@@ -125,13 +139,46 @@ export function processAnalytics(data: AnalyticsResponse): ProcessedData {
     currentlyPresent,
     alreadyLeft,
     avgDwellMinutes,
+    peakConcurrent,
     beaconProofCounts,
     userBeaconTransitions,
     checkInTimeline,
     checkOutTimeline,
+    presenceTimeline,
     dwellTimes,
     userDetails,
   };
+}
+
+function buildPresenceTimeline(
+  intervals: { first: number; last: number }[]
+): { time: number; count: number }[] {
+  if (intervals.length === 0) return [];
+  const bucketSize = 600;
+  let minTime = Infinity, maxTime = -Infinity;
+  for (const iv of intervals) {
+    if (iv.first < minTime) minTime = iv.first;
+    if (iv.last > maxTime) maxTime = iv.last;
+  }
+  const startBucket = Math.floor(minTime / bucketSize) * bucketSize;
+  const endBucket = Math.floor(maxTime / bucketSize) * bucketSize;
+
+  // Sweep: +1 at the first-proof bucket, -1 after the last-proof bucket
+  const delta: Record<number, number> = {};
+  for (const iv of intervals) {
+    const a = Math.floor(iv.first / bucketSize) * bucketSize;
+    const b = Math.floor(iv.last / bucketSize) * bucketSize;
+    delta[a] = (delta[a] || 0) + 1;
+    delta[b + bucketSize] = (delta[b + bucketSize] || 0) - 1;
+  }
+
+  const timeline: { time: number; count: number }[] = [];
+  let running = 0;
+  for (let t = startBucket; t <= endBucket; t += bucketSize) {
+    running += delta[t] || 0;
+    timeline.push({ time: t, count: running });
+  }
+  return timeline;
 }
 
 function bucketByInterval(

@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
-import { Space_Mono } from "next/font/google";
+import { Inter, Space_Mono } from "next/font/google";
 import "./globals.css";
 import SideNav from "@/components/SideNav";
 import ThemeToggle from "@/components/ThemeToggle";
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
 
 const spaceMono = Space_Mono({
   variable: "--font-space-mono",
@@ -22,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${spaceMono.variable} ${spaceMono.className}`}>
+      <body className={`${inter.variable} ${spaceMono.variable} ${inter.className}`}>
         <div className="h-screen flex overflow-hidden">
           <SideNav />
           <div className="flex-1 min-w-0">{children}</div>

@@ -7,6 +7,7 @@ interface Props {
   currentlyPresent: number;
   alreadyLeft: number;
   avgDwellMinutes: number;
+  peakConcurrent: number;
 }
 
 function formatDur(minutes: number): string {
@@ -59,6 +60,17 @@ const cards = [
       </svg>
     ),
   },
+  {
+    key: "peak",
+    label: "Peak",
+    color: "#7B5EA7",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+        <polyline points="17 6 23 6 23 12" />
+      </svg>
+    ),
+  },
 ];
 
 export default React.memo(function StatsCards({
@@ -66,12 +78,14 @@ export default React.memo(function StatsCards({
   currentlyPresent,
   alreadyLeft,
   avgDwellMinutes,
+  peakConcurrent,
 }: Props) {
   const values: Record<string, string> = {
     attended: String(totalAttendees),
     present: String(currentlyPresent),
     left: String(alreadyLeft),
     dwell: formatDur(avgDwellMinutes),
+    peak: String(peakConcurrent),
   };
 
   return (
@@ -79,10 +93,10 @@ export default React.memo(function StatsCards({
       {cards.map((c) => (
         <div key={c.key} className="skeuo-panel flex-1 px-4 py-2.5 flex items-center justify-between">
           <div>
-            <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+            <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-tertiary)" }}>
               {c.label}
             </div>
-            <div className="text-[22px] font-bold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
+            <div className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
               {values[c.key]}
             </div>
           </div>

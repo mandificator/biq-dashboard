@@ -1,7 +1,18 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { CrossEventAnalysis, ProcessedData, Profile } from "@/types";
+import dynamic from "next/dynamic";
+import { CrossEventAnalysis, EventSummary } from "@/types";
+
+// Recharts is heavy — load the comparison chart only when this view renders.
+const PresenceCompareChart = dynamic(() => import("./PresenceCompareChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+    </div>
+  ),
+});
 
 const COLORS = ["#0095FF", "#00D4F5", "#F7941D", "#8CC63F", "#7B5EA7"];
 
@@ -14,7 +25,7 @@ function formatDur(minutes: number): string {
 
 interface LiveDashboardProps {
   analysis: CrossEventAnalysis;
-  loadedData: Map<string, ProcessedData>;
+  loadedData: Map<string, EventSummary>;
   eventNames: Record<string, string>;
   eventDates: Record<string, number>;
 }
@@ -49,8 +60,14 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
   }, [analysis.eventMetrics, eventDates]);
 
   const allProfiles = useMemo(() => {
-    const profiles: Record<string, Profile> = {};
-    for (const [, data] of loadedData) Object.assign(profiles, data.profiles);
+    const profiles: Record<string, { displayName: string; profilePicture: string }> = {};
+    for (const [, data] of loadedData) {
+      for (const u of data.users) {
+        if (u.displayName || u.profilePicture) {
+          profiles[u.userId] = { displayName: u.displayName, profilePicture: u.profilePicture };
+        }
+      }
+    }
     return profiles;
   }, [loadedData]);
 
@@ -84,6 +101,19 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
 
   return (
     <div className="h-full flex flex-col gap-3 overflow-hidden">
+      {/* ── Hero: attendance flow comparison ── */}
+      <div className="skeuo-panel p-3 flex flex-col flex-shrink-0" style={{ height: "34%", minHeight: 180 }}>
+        <div className="text-[11px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+          Attendance Flow <span style={{ textTransform: "none", fontWeight: 400, opacity: 0.7 }}>— concurrent attendees, aligned to event start</span>
+        </div>
+        <div className="flex-1 min-h-0">
+          <PresenceCompareChart
+            curves={analysis.presenceCurves}
+            colors={Object.fromEntries(sortedMetrics.map((em) => [em.eventId, COLORS[em.origIndex % COLORS.length]]))}
+          />
+        </div>
+      </div>
+
       {/* ── Top row: bars left, users right ── */}
       <div className="flex gap-3 flex-1 min-h-0">
         {/* Left: Attendees / Dwell / Peak in separate panels */}
@@ -94,7 +124,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
             { key: "peak" as const, label: "Peak Concurrent", max: barMetrics.maxPeak, fmt: (v: number) => String(v) },
           ]).map((metric) => (
             <div key={metric.key} className="skeuo-panel p-3 flex flex-col flex-1 min-h-0">
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-1.5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
                 {metric.label}
               </div>
               <div className="flex flex-col justify-start gap-[2px] flex-1 min-h-0 overflow-auto">
@@ -103,12 +133,12 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
                   const pct = Math.round((value / metric.max) * 100);
                   return (
                     <div key={ev.eventId} className="flex flex-col gap-0.5 flex-shrink-0">
-                      <span className="text-[8px] font-bold" style={{ color: ev.color }}>
+                      <span className="text-[11px] font-bold" style={{ color: ev.color }}>
                         {ev.name}
                       </span>
                       <div className="w-full min-w-0 rounded-sm overflow-hidden relative" style={{ background: "var(--overlay-subtle)", height: 32 }}>
                         <div className="h-full rounded-sm transition-all duration-300" style={{ width: `${Math.max(pct, 1)}%`, background: ev.color, opacity: 0.85 }} />
-                        <span className="absolute inset-0 flex items-center px-1.5 text-[8px] font-bold tabular-nums" style={{ color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
+                        <span className="absolute inset-0 flex items-center px-1.5 text-[11px] font-bold tabular-nums" style={{ color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
                           {metric.fmt(value)} <span className="ml-0.5" style={{ opacity: 0.7 }}>({pct}%)</span>
                         </span>
                       </div>
@@ -123,12 +153,12 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
         {/* Right: Users list */}
         <div className="skeuo-panel p-3 flex flex-col flex-1 min-w-0 min-h-0">
           <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
-            <span className="text-[9px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
+            <span className="text-[11px] font-bold uppercase tracking-wider flex-1" style={{ color: "var(--text-tertiary)" }}>
               Users ({filteredUsers.length})
             </span>
             <button
               onClick={() => setUserEventFilter(null)}
-              className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+              className="text-[11px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
               style={{ color: userEventFilter === null ? "var(--text-primary)" : "var(--text-secondary)" }}>
               All
             </button>
@@ -136,7 +166,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
               <button
                 key={n}
                 onClick={() => setUserEventFilter(userEventFilter === n ? null : n)}
-                className="text-[8px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
+                className="text-[11px] font-bold px-1.5 py-0.5 rounded skeuo-btn"
                 style={{ color: userEventFilter === n ? "var(--text-primary)" : "var(--text-secondary)" }}>
                 {n}ev
               </button>
@@ -145,7 +175,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
           <div className="flex-1 min-h-0 overflow-auto">
             {filteredUsers.length === 0 && (
               <div className="flex items-center justify-center h-full">
-                <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>No users</span>
+                <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>No users</span>
               </div>
             )}
             {filteredUsers.slice(0, 50).map((user, idx) => {
@@ -156,7 +186,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
                 <div key={user.userId} className="flex items-center py-1 px-1"
                   style={{ borderBottom: idx < Math.min(filteredUsers.length, 50) - 1 ? "1px solid var(--overlay-subtle)" : undefined }}>
                   <Avatar src={profile?.profilePicture} name={name} size={20} />
-                  <span className="text-[9px] font-bold truncate flex-shrink-0 ml-1.5" style={{ color: "var(--text-primary)", width: 95 }}>
+                  <span className="text-[11px] font-bold truncate flex-shrink-0 ml-1.5" style={{ color: "var(--text-primary)", width: 95 }}>
                     {name}
                   </span>
                   <div className="flex-1" />
@@ -173,13 +203,13 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
                     })}
                   </div>
                   <div className="flex-1" />
-                  <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--accent)", width: 22 }}>
+                  <span className="text-[11px] font-bold flex-shrink-0 text-right" style={{ color: "var(--accent)", width: 22 }}>
                     {user.eventIds.length} ev
                   </span>
-                  <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-secondary)", width: 28, marginLeft: 6 }}>
+                  <span className="text-[11px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-secondary)", width: 28, marginLeft: 6 }}>
                     {user.totalProofs}p
                   </span>
-                  <span className="text-[8px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-tertiary)", width: 42, marginLeft: 6, whiteSpace: "nowrap" }}>
+                  <span className="text-[11px] font-bold flex-shrink-0 text-right" style={{ color: "var(--text-tertiary)", width: 42, marginLeft: 6, whiteSpace: "nowrap" }}>
                     {formatDur(user.totalDwell)}
                   </span>
                 </div>
@@ -191,7 +221,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
 
       {/* ── Bottom center: User Overlap ── */}
       <div className="skeuo-panel p-3 flex flex-col flex-shrink-0">
-        <div className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)" }}>
+        <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-tertiary)" }}>
           User Overlap
         </div>
         <div className="overflow-auto">
@@ -200,7 +230,7 @@ export default function LiveDashboard({ analysis, loadedData, eventNames, eventD
             const maxChars = n <= 2 ? 30 : n <= 3 ? 20 : n <= 5 ? 12 : 8;
             const truncName = (name: string) => name.length > maxChars ? name.substring(0, maxChars - 1) + "…" : name;
             return (
-              <table className="text-[8px] w-full" style={{ tableLayout: "fixed" }}>
+              <table className="text-[11px] w-full" style={{ tableLayout: "fixed" }}>
                 <thead>
                   <tr>
                     <th />

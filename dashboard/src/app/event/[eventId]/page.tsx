@@ -2,13 +2,29 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { AnalyticsResponse, ProcessedData, Beacon, LumaGuest } from "@/types";
 import { processAnalytics, mergeAnalytics } from "@/lib/processData";
 import StatsCards from "@/components/StatsCards";
-import BeaconHeatmap from "@/components/BeaconHeatmap";
-import { CheckInChart, CheckOutChart, DwellTimeChart } from "@/components/Charts";
 import UsersTab, { UserDetailPanel } from "@/components/UsersTab";
 import BeaconsTab from "@/components/BeaconsTab";
+
+function PanelSpinner() {
+  return (
+    <div className="skeuo-panel h-full flex items-center justify-center">
+      <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+    </div>
+  );
+}
+
+// Heavy components (recharts, 2.5k-line SVG map) load on demand to keep
+// the initial bundle small.
+const BeaconHeatmap = dynamic(() => import("@/components/BeaconHeatmap"), { ssr: false, loading: PanelSpinner });
+const PresenceChart = dynamic(() => import("@/components/Charts").then(m => m.PresenceChart), { ssr: false, loading: PanelSpinner });
+const CheckInChart = dynamic(() => import("@/components/Charts").then(m => m.CheckInChart), { ssr: false, loading: PanelSpinner });
+const CheckOutChart = dynamic(() => import("@/components/Charts").then(m => m.CheckOutChart), { ssr: false, loading: PanelSpinner });
+const DwellHistogram = dynamic(() => import("@/components/Charts").then(m => m.DwellHistogram), { ssr: false, loading: PanelSpinner });
+const RetentionChart = dynamic(() => import("@/components/Charts").then(m => m.RetentionChart), { ssr: false, loading: PanelSpinner });
 
 const REFRESH_INTERVAL = 30_000;
 
@@ -394,11 +410,11 @@ export default function EventPage() {
             {processed.event.organizerId?.[0] && (
               <>
                 <a href={`/organizer/${processed.event.organizerId[0]}`}
-                  className="text-[10px] font-bold hover:underline"
+                  className="text-[11px] font-bold hover:underline"
                   style={{ color: "var(--text-tertiary)" }}>
                   {orgName || "Organizer"}
                 </a>
-                <span className="text-[9px]" style={{ color: "var(--text-tertiary)", opacity: 0.5 }}>/</span>
+                <span className="text-[10px]" style={{ color: "var(--text-tertiary)", opacity: 0.5 }}>/</span>
               </>
             )}
             {processed.event.image && (
@@ -408,7 +424,7 @@ export default function EventPage() {
                 style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
               />
             )}
-            <span className="text-[11px] font-bold" style={{ color: "var(--text-secondary)" }}>
+            <span className="text-[12px] font-bold" style={{ color: "var(--text-secondary)" }}>
               {processed.event.name}
             </span>
           </>)}
@@ -420,7 +436,7 @@ export default function EventPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className="px-3.5 py-1 rounded-md text-[11px] font-bold capitalize transition-all duration-100"
+                className="px-3.5 py-1 rounded-md text-[12px] font-bold capitalize transition-all duration-100"
                 style={{
                   background: activeTab === tab ? "var(--selected-bg)" : "transparent",
                   color: activeTab === tab ? "var(--text-primary)" : "var(--text-tertiary)",
@@ -438,7 +454,7 @@ export default function EventPage() {
             <>
               <div className="flex items-center gap-2">
                 {lastRefresh && (
-                  <span className="text-[9px] font-bold" style={{ color: "var(--text-tertiary)" }}>
+                  <span className="text-[10px] font-bold" style={{ color: "var(--text-tertiary)" }}>
                     {lastRefresh.toLocaleTimeString()}
                   </span>
                 )}
@@ -455,7 +471,7 @@ export default function EventPage() {
                 </button>
               </div>
               <label
-                className="skeuo-btn px-3 py-1.5 text-[11px] font-bold cursor-pointer"
+                className="skeuo-btn px-3 py-1.5 text-[12px] font-bold cursor-pointer"
                 style={{ color: "#a855f7", borderColor: "#a855f744" }}
                 title="Upload Luma guest CSV for automatic check-in"
               >
@@ -467,7 +483,7 @@ export default function EventPage() {
               </label>
               <button
                 onClick={() => exportCSV(processed, beaconNames)}
-                className="skeuo-btn px-3 py-1.5 text-[11px] font-bold mr-8"
+                className="skeuo-btn px-3 py-1.5 text-[12px] font-bold mr-8"
                 style={{ color: "#8CC63F", borderColor: "#8CC63F44" }}
               >
                 Export
@@ -480,7 +496,7 @@ export default function EventPage() {
       {/* Content */}
       <main className="flex-1 min-h-0 p-3">
         {error && (
-          <div className="skeuo-panel p-3 text-[11px] mb-3" style={{ color: "var(--red)", borderColor: "rgba(240, 96, 80, 0.2)" }}>
+          <div className="skeuo-panel p-3 text-[12px] mb-3" style={{ color: "var(--red)", borderColor: "rgba(240, 96, 80, 0.2)" }}>
             {error}
           </div>
         )}
@@ -498,20 +514,31 @@ export default function EventPage() {
               currentlyPresent={processed.currentlyPresent}
               alreadyLeft={processed.alreadyLeft}
               avgDwellMinutes={processed.avgDwellMinutes}
+              peakConcurrent={processed.peakConcurrent}
             />
 
             <div className="flex gap-3 flex-1 min-h-0">
               <div className="flex-1 min-w-0 flex flex-col gap-3 min-h-0">
                 {activeTab === "overview" && (
                   <>
-                    <div className="flex-1 min-h-0">
-                      <CheckInChart data={processed.checkInTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
+                    <div className="min-h-0" style={{ flex: 1.25 }}>
+                      <PresenceChart data={processed.presenceTimeline} peak={processed.peakConcurrent} />
                     </div>
-                    <div className="flex-1 min-h-0">
-                      <CheckOutChart data={processed.checkOutTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
+                    <div className="flex-1 min-h-0 flex gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CheckInChart data={processed.checkInTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <CheckOutChart data={processed.checkOutTimeline} profiles={processed.profiles} onClickUser={handleChartClickUser} />
+                      </div>
                     </div>
-                    <div className="flex-1 min-h-0">
-                      <DwellTimeChart data={processed.dwellTimes} profiles={processed.profiles} onClickUser={handleChartClickUser} />
+                    <div className="flex-1 min-h-0 flex gap-3">
+                      <div className="flex-1 min-w-0">
+                        <DwellHistogram data={processed.dwellTimes} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <RetentionChart data={processed.dwellTimes} />
+                      </div>
                     </div>
                   </>
                 )}
@@ -538,7 +565,7 @@ export default function EventPage() {
                           <UserDetailPanel user={selectedUser} beacons={processed.beacons} beaconNames={beaconNames} onTimeClick={setPlaybackTime} lumaGuest={lumaGuests[selectedUser.userId.toLowerCase()]} />
                         ) : (
                           <div className="skeuo-panel h-full flex items-center justify-center">
-                            <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
+                            <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>Select a user to see details</span>
                           </div>
                         )}
                       </div>

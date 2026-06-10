@@ -1,7 +1,7 @@
-import { ProcessedData, CrossEventAnalysis } from "@/types";
+import { EventSummary, CrossEventAnalysis } from "@/types";
 
 export function analyzeCrossEvents(
-  datasets: { eventId: string; data: ProcessedData }[]
+  datasets: { eventId: string; data: EventSummary }[]
 ): CrossEventAnalysis {
   // Map userId → set of eventIds
   const userEvents: Record<string, Set<string>> = {};
@@ -9,7 +9,7 @@ export function analyzeCrossEvents(
   const userStats: Record<string, { totalProofs: number; totalDwell: number }> = {};
 
   for (const { eventId, data } of datasets) {
-    for (const user of data.userDetails) {
+    for (const user of data.users) {
       if (!userEvents[user.userId]) {
         userEvents[user.userId] = new Set();
         userStats[user.userId] = { totalProofs: 0, totalDwell: 0 };
@@ -31,37 +31,33 @@ export function analyzeCrossEvents(
     .sort((a, b) => b.eventIds.length - a.eventIds.length || b.totalProofs - a.totalProofs);
 
   // Per-event metrics
-  const eventMetrics = datasets.map(({ eventId, data }) => {
-    // Peak concurrent: max count in check-in timeline minus check-outs
-    let peakConcurrent = 0;
-    const checkInMap: Record<number, number> = {};
-    for (const bucket of data.checkInTimeline) {
-      checkInMap[bucket.time] = bucket.count;
-    }
-    const checkOutMap: Record<number, number> = {};
-    for (const bucket of data.checkOutTimeline) {
-      checkOutMap[bucket.time] = bucket.count;
-    }
-    // Simple peak: just max check-in bucket count
-    peakConcurrent = data.checkInTimeline.reduce((max, b) => Math.max(max, b.count), 0);
+  const eventMetrics = datasets.map(({ eventId, data }) => ({
+    eventId,
+    eventName: data.event.name,
+    totalAttendees: data.totalAttendees,
+    avgDwellMinutes: data.avgDwellMinutes,
+    uniqueBeacons: data.uniqueBeacons,
+    totalProofs: data.totalProofs,
+    peakConcurrent: data.peakConcurrent,
+  }));
 
-    return {
-      eventId,
-      eventName: data.event.name,
-      totalAttendees: data.totalAttendees,
-      avgDwellMinutes: data.avgDwellMinutes,
-      uniqueBeacons: Object.keys(data.beacons).length,
-      totalProofs: data.proofs.length,
-      peakConcurrent,
-    };
+  // Presence curves aligned to minutes-from-event-start so different
+  // events can be overlaid and compared shape-to-shape.
+  const presenceCurves = datasets.map(({ eventId, data }) => {
+    const start = data.event.startTime;
+    const points = data.presenceTimeline.map((b) => ({
+      minute: Math.round((b.time - start) / 60),
+      count: b.count,
+    }));
+    return { eventId, eventName: data.event.name, points };
   });
 
   // Overlap matrix: for each pair of events, count shared users
   const overlapMatrix: CrossEventAnalysis["overlapMatrix"] = [];
   for (let i = 0; i < datasets.length; i++) {
-    const usersA = new Set(datasets[i].data.userDetails.map((u) => u.userId));
+    const usersA = new Set(datasets[i].data.users.map((u) => u.userId));
     for (let j = i + 1; j < datasets.length; j++) {
-      const usersB = new Set(datasets[j].data.userDetails.map((u) => u.userId));
+      const usersB = new Set(datasets[j].data.users.map((u) => u.userId));
       let sharedCount = 0;
       for (const uid of usersA) {
         if (usersB.has(uid)) sharedCount++;
@@ -74,5 +70,5 @@ export function analyzeCrossEvents(
     }
   }
 
-  return { sharedUsers, eventMetrics, overlapMatrix };
+  return { sharedUsers, eventMetrics, presenceCurves, overlapMatrix };
 }
